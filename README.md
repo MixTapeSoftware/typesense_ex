@@ -1,6 +1,6 @@
 # Typesense
 
-Elixir bindings for Typesense
+__EXPERIMENTAL / WORK IN PROGRESS__: Elixir bindings for Typesense
 
 ## Installation
 
