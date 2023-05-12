@@ -84,7 +84,7 @@ defmodule Typesense.ClientTest do
     Client.set_healthy(first_node)
     # There is still one good node in the stack
     # so we need to pop it of before we can get to
-    # the newly unknown status 8107
+    # the newly healthy status 8107
     assert_next_node("8109", :healthy)
     assert_next_node("8107", :healthy)
   end
