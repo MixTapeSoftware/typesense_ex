@@ -4,11 +4,13 @@ defmodule Typesense.TypesenseNode do
   """
   alias __MODULE__
 
+  @type health_status :: :healthy | :unhealthy | :maybe_healthy
+
   @type t :: %TypesenseNode{
           host: String.t(),
           port: String.t(),
           protocol: String.t(),
-          health_status: :healthy | :unhealthy | :maybe_healthy,
+          health_status: health_status,
           health_set_on: DateTime.t()
         }
 
@@ -26,7 +28,7 @@ defmodule Typesense.TypesenseNode do
     health_set_on: DateTime.utc_now()
   ]
 
-  @spec new(config) :: t
+  @spec new(TypesenseNode.config()) :: TypesenseNode.t()
   def new(config) do
     struct(TypesenseNode, config)
   end
@@ -36,7 +38,7 @@ defmodule Typesense.TypesenseNode do
     Map.take(node, [:host, :port, :protocol])
   end
 
-  @spec valid?(t) :: boolean()
+  @spec valid?(TypesenseNode.config()) :: boolean()
   def valid?(node) do
     is_binary(node[:host]) and
       is_binary(node[:port]) and

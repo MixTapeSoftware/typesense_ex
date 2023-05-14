@@ -23,7 +23,9 @@ defmodule Typesense.MixProject do
     [
       {:tesla, "~> 1.6.1"},
       {:hackney, "~> 1.17", only: [:dev, :test]},
-      {:jason, "~> 1.0", only: [:dev, :test]}
+      {:jason, "~> 1.0", only: [:dev, :test]},
+      {:mox, "~> 1.0", only: :test},
+      {:dialyxir, "~> 1.3", only: [:dev], runtime: false}
     ]
   end
 end
