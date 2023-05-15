@@ -1,4 +1,7 @@
 defmodule Typesense.Request do
+  @moduledoc """
+  Encapsulates Typesense request logic
+  """
   alias Typesense.Client
   alias Typesense.TypesenseNode
 
@@ -9,14 +12,27 @@ defmodule Typesense.Request do
   @type retries :: integer()
   @type header :: {String.t(), String.t()}
 
-  @callback fetch(method(), path(), body(), params(), retries()) :: {:ok, map()} | {:error, any()}
-  def fetch(method, path, body, params, retries \\ 0) do
+  @callback execute(method(), path(), body(), params(), retries(), TypesenseNode.t() | nil) ::
+              {:ok, map()} | {:error, any()}
+
+  @doc """
+  Handles executing requests, retrying and marking nodes as healthy/unhealthy
+  based on the results
+  """
+  def execute(method, path, body \\ "", params \\ [], retries \\ 0, retry_node \\ nil) do
     client = Client.get()
-    node = Client.next_node()
+
+    node =
+      if not is_nil(retry_node) do
+        retry_node
+      else
+        Client.next_node()
+      end
+
     headers = to_headers(client)
 
     response =
-      Typesense.Http.request(
+      Typesense.Http.execute(
         method: method,
         url: url_for(node, path),
         query: params,
@@ -26,6 +42,7 @@ defmodule Typesense.Request do
 
     case response do
       {:ok, %Tesla.Env{status: status, body: body}} when status in 1..499 ->
+        Client.set_healthy(node)
         Jason.decode(body)
 
       {:ok, bad_response} ->
@@ -34,8 +51,9 @@ defmodule Typesense.Request do
         if retries <= client.num_retries do
           miliseconds = client.connection_timeout_seconds * 1000
           Process.sleep(miliseconds)
-          fetch(method, path, body, params, retries)
+          execute(method, path, body, params, retries, node)
         else
+          Client.set_unhealthy(node)
           {:error, bad_response}
         end
     end

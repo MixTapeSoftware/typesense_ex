@@ -13,23 +13,22 @@ defmodule Typesense.Http do
 
   @type middleware :: [{any(), any()}] | []
 
-  @callback client(middleware(), any()) :: Tesla.Client.t()
-  # @callback request([option]) :: Tesla.Env.result()
+  @callback client(middleware()) :: Tesla.Client.t()
+  @callback request(Tesla.Client.t(), [option]) :: {:ok, Tesla.Env.t()}
 
-  def client(middleware, adapter), do: impl().client(middleware, adapter)
+  def client(middleware), do: impl().client(middleware)
 
-  def request(options) do
-    configured_client().request(options)
+  def request(client, options), do: impl().request(client, options)
+
+  def execute(options) do
+    impl().request(configured_client(), options)
   end
 
-  defp configured_client() do
-    adapter = Application.get_env(:typesense, :adapter, Tesla.Adapter.Hackney)
-    middleware = Application.get_env(:typesense, :middleware, [])
-
-    impl().client(middleware, adapter)
+  def configured_client() do
+    Application.get_env(:typesense, :middleware, []) |> client()
   end
 
-  defp impl do
+  def impl do
     Application.get_env(:typesense, :http_library, Tesla)
   end
 end

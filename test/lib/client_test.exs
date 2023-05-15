@@ -34,13 +34,6 @@ defmodule Typesense.ClientTest do
       }),
       "Invalid Nearest Node Specification"
     )
-
-    assert_misconfig(
-      Map.merge(@minimal_valid_config, %{
-        nearest_node: nil
-      }),
-      "Invalid Nearest Node Specification"
-    )
   end
 
   test "start_link/1 with invalid nodes" do
@@ -48,7 +41,14 @@ defmodule Typesense.ClientTest do
       Map.merge(@minimal_valid_config, %{
         nodes: [%{host_zzz: "localhost", port: "8107", protocol: "https"}]
       }),
-      "One or more node configurations is missing data."
+      "One or More Node Configurations Missing Data"
+    )
+  end
+
+  test "start_link/1 with missing nodes" do
+    assert_misconfig(
+      Map.delete(@minimal_valid_config, :nodes),
+      "Configuration Missing Node List"
     )
   end
 

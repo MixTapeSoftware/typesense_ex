@@ -33,7 +33,7 @@ defmodule Typesense.Client do
   @type config :: %{
           api_key: api_key(),
           nodes: [TypesenseNode.config()],
-          nearest_node: TypesenseNode.config(),
+          nearest_node: TypesenseNode.config() | nil,
           connection_timeout_seconds: integer(),
           healthcheck_interval_seconds: integer(),
           num_retries: integer(),
@@ -307,7 +307,12 @@ defmodule Typesense.Client do
     {:error, "Configuration Missing API Key"}
   end
 
-  @spec init_nearest_node(config()) :: {:ok, TypesenseNode.t()} | error()
+  @spec init_nearest_node(config()) :: {:ok, TypesenseNode.t()} | {:ok, nil} | error()
+
+  defp init_nearest_node(config) when not is_map_key(config, :nearest_node), do: {:ok, nil}
+
+  defp init_nearest_node(%{nearest_node: nil}), do: {:ok, nil}
+
   defp init_nearest_node(%{nearest_node: nearest_node_params}) do
     if TypesenseNode.valid?(nearest_node_params) do
       {:ok, TypesenseNode.new(nearest_node_params)}
@@ -315,8 +320,6 @@ defmodule Typesense.Client do
       {:error, "Invalid Nearest Node Specification"}
     end
   end
-
-  defp init_nearest_node(_config_), do: {:ok, nil}
 
   @spec init_nodes(config()) :: {:ok, nodes()} | {:error, String.t()}
   defp init_nodes(%{nodes: nodes}) when length(nodes) == 0 do
@@ -334,12 +337,16 @@ defmodule Typesense.Client do
   defp init_nodes(%{nodes: nodes}) do
     nodes_valid? = Enum.all?(nodes, &TypesenseNode.valid?/1)
 
-    err_msg = "One or more node configurations is missing data."
+    err_msg = "One or More Node Configurations Missing Data"
 
     if nodes_valid? do
       {:ok, Enum.map(nodes, &TypesenseNode.new/1)}
     else
       {:error, err_msg}
     end
+  end
+
+  defp init_nodes(_config_without_nodes) do
+    {:error, "Configuration Missing Node List"}
   end
 end
