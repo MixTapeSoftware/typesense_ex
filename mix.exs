@@ -25,7 +25,8 @@ defmodule Typesense.MixProject do
       {:hackney, "~> 1.17", only: [:dev, :test]},
       {:jason, "~> 1.0", only: [:dev, :test]},
       {:mox, "~> 1.0", only: :test},
-      {:dialyxir, "~> 1.3", only: [:dev], runtime: false}
+      {:dialyxir, "~> 1.3", only: [:dev], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 end
