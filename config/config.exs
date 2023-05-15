@@ -2,9 +2,9 @@ import Config
 
 config :logger, level: :debug
 
-config :typesense,
+config :typesense_ex,
   middleware: []
 
 if Mix.env() == :test do
-  config :typesense, adapter: Tesla.Adapter.Hackney
+  config :typesense_ex, adapter: Tesla.Adapter.Hackney
 end

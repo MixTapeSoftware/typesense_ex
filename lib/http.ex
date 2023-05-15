@@ -25,10 +25,10 @@ defmodule Typesense.Http do
   end
 
   def configured_client() do
-    Application.get_env(:typesense, :middleware, []) |> client()
+    Application.get_env(:typesense_ex, :middleware, []) |> client()
   end
 
   def impl do
-    Application.get_env(:typesense, :http_library, Tesla)
+    Application.get_env(:typesense_ex, :http_library, Tesla)
   end
 end
