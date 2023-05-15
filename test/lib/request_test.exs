@@ -1,28 +1,8 @@
 defmodule Typesense.RequestTest do
-  use ExUnit.Case, async: true
-  use ExUnit.CaseTemplate
+  use TypesenseCase, async: true
   alias Typesense.Client
-  alias Typesense.Request
   alias Typesense.MockHttp
-
-  import Mox
-
-  @valid_nodes [
-    %{host: "localhost", port: "8107", protocol: "https"},
-    %{host: "localhost", port: "8108", protocol: "https"}
-  ]
-
-  @minimal_valid_config %{
-    api_key: "123",
-    connection_timeout_seconds: 0,
-    num_retries: 2,
-    nodes: @valid_nodes,
-    # A convenience to prevent tests from being slow
-    healthcheck_interval_seconds: 0
-  }
-
-  # Make sure mocks are verified when the test exits
-  setup :verify_on_exit!
+  alias Typesense.Request
 
   test "request/5 returns and decodes a valid response" do
     {:ok, _pid} = Client.start_link(@minimal_valid_config)
@@ -38,11 +18,53 @@ defmodule Typesense.RequestTest do
     assert Request.execute(:get, "/fake-endpoint") == {:ok, %{"results" => []}}
   end
 
+  test "request/5 handles jsonl responses" do
+    {:ok, _pid} = Client.start_link(@minimal_valid_config)
+
+    MockHttp
+    |> expect(:request, 1, fn _client, _options ->
+      {:ok, %Tesla.Env{status: 200, body: "{\"success\":true}\n{\"success\":true}"}}
+    end)
+    |> expect(:client, 1, fn _middleware ->
+      {:ok, %Tesla.Env{status: 200, body: "{\"results\": []}"}}
+    end)
+
+    assert Request.execute(:get, "/fake-endpoint") ==
+             {:ok, [%{"success" => true}, %{"success" => true}]}
+  end
+
+  test "request/5 encodes in text/plain when given a string body" do
+    {:ok, _pid} = Client.start_link(@minimal_valid_config)
+
+    MockHttp
+    |> expect(:request, 3, fn _client, params ->
+      assert {"Content-Type", "text/plain"} in Keyword.get(params, :headers)
+      {:ok, %Tesla.Env{status: 500, body: "{}"}}
+    end)
+    |> expect(:client, 3, fn _middleware ->
+      {:ok, %Tesla.Env{status: 200, body: "{\"results\": []}"}}
+    end)
+
+    assert Request.execute(:get, "/fake-endpoint", "string body") ==
+             {:error,
+              %Tesla.Env{
+                __client__: nil,
+                __module__: nil,
+                body: "{}",
+                headers: [],
+                method: nil,
+                opts: [],
+                query: [],
+                status: 500,
+                url: ""
+              }}
+  end
+
   @first_node_params [
     method: :get,
     url: "https://localhost:8107/fake-endpoint",
     query: [],
-    body: "",
+    body: "{}",
     headers: [
       {"X-TYPESENSE-API-KEY", "123"},
       {"Content-Type", "application/json"}
@@ -53,7 +75,7 @@ defmodule Typesense.RequestTest do
     {:ok, _pid} = Client.start_link(@minimal_valid_config)
 
     MockHttp
-    |> expect(:request, 3, fn _client, @first_node_params ->
+    |> expect(:request, 3, fn _client, _params ->
       {:ok, %Tesla.Env{status: 500, body: "{}"}}
     end)
     |> expect(:client, 3, fn _middleware -> %Tesla.Client{} end)
