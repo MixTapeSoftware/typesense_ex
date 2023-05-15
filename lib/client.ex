@@ -31,9 +31,9 @@ defmodule Typesense.Client do
         }
 
   @type config :: %{
+          optional(:nearest_node) => TypesenseNode.config(),
           api_key: api_key(),
           nodes: [TypesenseNode.config()],
-          nearest_node: TypesenseNode.config() | nil,
           connection_timeout_seconds: integer(),
           healthcheck_interval_seconds: integer(),
           num_retries: integer(),
@@ -134,7 +134,7 @@ defmodule Typesense.Client do
 
   @impl true
   def handle_call(:next_node, _from, %{nodes: nodes, next_nodes: next_nodes} = client)
-      when length(next_nodes) == 0 do
+      when next_nodes == [] do
     Logger.error("[Typesense] Couldn't Find a Healthy Node. Reverting to First Node.")
 
     {:reply, List.first(nodes), client}
@@ -311,8 +311,6 @@ defmodule Typesense.Client do
 
   defp init_nearest_node(config) when not is_map_key(config, :nearest_node), do: {:ok, nil}
 
-  defp init_nearest_node(%{nearest_node: nil}), do: {:ok, nil}
-
   defp init_nearest_node(%{nearest_node: nearest_node_params}) do
     if TypesenseNode.valid?(nearest_node_params) do
       {:ok, TypesenseNode.new(nearest_node_params)}
@@ -322,7 +320,7 @@ defmodule Typesense.Client do
   end
 
   @spec init_nodes(config()) :: {:ok, nodes()} | {:error, String.t()}
-  defp init_nodes(%{nodes: nodes}) when length(nodes) == 0 do
+  defp init_nodes(%{nodes: nodes}) when nodes == [] do
     {:error, "Configuration Contains an Empty Node List"}
   end
 
