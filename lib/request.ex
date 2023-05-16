@@ -49,8 +49,8 @@ defmodule Typesense.Request do
         retries = retries + 1
 
         if retries <= client.num_retries do
-          miliseconds = client.connection_timeout_seconds * 1000
-          Process.sleep(miliseconds)
+          milliseconds = (client.retry_interval_seconds * 1000) |> round()
+          Process.sleep(milliseconds)
           execute(method, path, body, params, retries, node)
         else
           Client.set_unhealthy(node)
