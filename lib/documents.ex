@@ -72,7 +72,21 @@ defmodule Typesense.Documents do
   @doc """
   Import documents
 
-  Note: we can't use "import" here as it is a reserved kernel keyword
+  ## IMPORTANT NOTE & TIP
+
+  All fields you mention in a collection's schema will be indexed in memory.
+
+  There might be cases where you don't intend to search / filter / facet /
+  group by a particular field and just want it to be stored (on disk) and
+  returned as is when a document is a search hit. For eg: you can store image
+  URLs in every document that you might use when displaying search results,
+  but you might not want to text-search the actual URLs.
+
+  You want to NOT mention these fields in the collection's schema or mark
+  these fields as index: false (see fields schema parameter below) to mark
+  it as an unindexed field. You can have any number of these additional
+  unindexed fields in the documents when adding them to a collection - they
+  will just be stored on disk, and will not take up any memory.
   """
   @spec import_documents(collection_name(), [document] | String.t(), params()) :: response()
   def import_documents(collection, documents, params \\ [])
@@ -82,7 +96,10 @@ defmodule Typesense.Documents do
   end
 
   def import_documents(collection, documents, params) when is_list(documents) do
-    jsonl_documents = Enum.map_join(documents, "\n", &Jason.encode!/1)
+    jsonl_documents =
+      documents
+      |> Stream.map(&Jason.encode!/1)
+      |> Enum.join("\n")
 
     import_documents(collection, jsonl_documents, params)
   end
