@@ -8,7 +8,7 @@ defmodule Typesense.Request do
   @type method :: atom()
   @type path :: String.t()
   @type body :: map() | String.t()
-  @type params :: [Keyword.t()] | []
+  @type params :: [{atom(), atom()}] | []
   @type retries :: integer()
   @type header :: {String.t(), String.t()}
   @type headers :: [header] | []
@@ -29,7 +29,7 @@ defmodule Typesense.Request do
     headers =
       []
       |> apply_content_type(body)
-      |> mabye_apply_api_key(client)
+      |> maybe_apply_api_key(client)
 
     response =
       Typesense.Http.execute(
@@ -118,9 +118,9 @@ defmodule Typesense.Request do
     [{"Content-Type", "text/plain"} | headers]
   end
 
-  defp mabye_apply_api_key(headers, %Client{api_key: nil}), do: headers
+  defp maybe_apply_api_key(headers, %Client{api_key: nil}), do: headers
 
-  defp mabye_apply_api_key(headers, %Client{api_key: api_key}) do
+  defp maybe_apply_api_key(headers, %Client{api_key: api_key}) do
     [{"X-TYPESENSE-API-KEY", api_key} | headers]
   end
 end

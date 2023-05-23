@@ -128,7 +128,7 @@ defmodule Typesense.Documents do
   @spec modify(collection_name(), document(), params(), atom()) :: response()
   defp modify(collection, document, params, action) do
     path = endpoint_path(collection)
-    upsert_options = Keyword.merge(params, action: action)
-    Request.execute(:post, path, document, upsert_options)
+    options = Keyword.merge(params, action: action)
+    Request.execute(:post, path, document, options)
   end
 end
