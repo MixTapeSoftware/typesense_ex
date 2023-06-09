@@ -21,52 +21,50 @@ defmodule Typesense.Documents do
           atom() => String.t()
         }
 
-  @documents_path "/documents"
-
-  @spec create(collection_name(), document(), params()) :: response()
-  def create(collection, document, params \\ []) do
+  @spec create(collection_name(), document()) :: response()
+  def create(collection, document) do
     path = endpoint_path(collection)
-    Request.execute(:post, path, document, params)
+    Request.execute(:post, path, document)
   end
 
   @spec upsert(collection_name(), document(), params()) :: response()
-
   def upsert(collection, document, params \\ []) do
     modify(collection, document, params, :upsert)
   end
 
+  @spec update(collection_name(), document(), params()) :: response()
   def update(collection, document, params \\ []) do
     modify(collection, document, params, :update)
   end
 
-  @spec update(collection_name(), document(), params()) :: response()
+  @spec partial_update(collection_name(), document(), params()) :: response()
   def partial_update(collection, partial_document, params \\ []) do
     path = endpoint_path(collection, partial_document["id"])
     Request.execute(:patch, path, partial_document, params)
   end
 
-  @spec update(collection_name(), document_id(), params()) :: response()
+  @spec retrieve(collection_name(), document_id(), params()) :: response()
   def retrieve(collection, document_id, params \\ []) do
     path = endpoint_path(collection, document_id)
-    Request.execute(:patch, path, "", params)
+    Request.execute(:patch, path, nil, params)
   end
 
   @spec delete(collection_name(), document_id()) :: response()
   def delete(collection, document_id) when is_integer(document_id) do
     document_path = endpoint_path(collection, document_id)
-    Request.execute(:delete, document_path)
+    Request.execute(:delete, document_path, nil)
   end
 
   @spec delete(collection_name(), delete_params()) :: response()
   def delete(collection, search_params) do
     document_path = endpoint_path(collection)
-    Request.execute(:delete, document_path, "", search_params)
+    Request.execute(:delete, document_path, nil, search_params)
   end
 
   @spec search(collection_name(), search_params()) :: response()
   def search(collection, search_params) do
     path = endpoint_path(collection, "search")
-    Request.execute(:get, path, "", search_params)
+    Request.execute(:get, path, nil, search_params)
   end
 
   @doc """
@@ -86,7 +84,7 @@ defmodule Typesense.Documents do
   these fields as index: false (see fields schema parameter below) to mark
   it as an unindexed field. You can have any number of these additional
   unindexed fields in the documents when adding them to a collection - they
-  will just be stored on disk, and will not take up any memory.
+  will just be stored on disk, *and will not take up any memory*.
   """
   @spec import_documents(collection_name(), [document] | String.t(), params()) :: response()
   def import_documents(collection, documents, params \\ [])
@@ -112,7 +110,7 @@ defmodule Typesense.Documents do
   @spec export_documents(collection_name(), params()) :: response()
   def export_documents(collection, params \\ []) do
     path = endpoint_path(collection, "export")
-    Request.execute(:get, path, "", params)
+    Request.execute(:get, path, nil, params)
   end
 
   @spec endpoint_path(collection_name(), atom() | String.t() | integer()) :: String.t()
@@ -122,7 +120,7 @@ defmodule Typesense.Documents do
 
   @spec endpoint_path(collection_name()) :: String.t()
   defp endpoint_path(collection_name) do
-    "#{Collections.resource_path()}/#{collection_name}/#{@documents_path}"
+    "#{Collections.resource_path()}/#{collection_name}/documents"
   end
 
   @spec modify(collection_name(), document(), params(), atom()) :: response()
