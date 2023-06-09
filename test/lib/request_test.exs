@@ -1,12 +1,17 @@
 defmodule Typesense.RequestTest do
-  use TypesenseCase, async: true
+  use TypesenseCase, async: false
+  use ExUnit.Case, async: true
   alias Typesense.Client
   alias Typesense.MockHttp
   alias Typesense.Request
 
-  test "request/5 returns and decodes a valid response" do
-    {:ok, _pid} = Client.start_link(@minimal_valid_config)
+  setup do
+    _pid = start_link_supervised!({Typesense.Client, @minimal_valid_config})
 
+    :ok
+  end
+
+  test "request/5 returns and decodes a valid response" do
     MockHttp
     |> expect(:request, 1, fn _client, _options ->
       {:ok, %Tesla.Env{status: 200, body: "{\"results\": []}"}}
@@ -19,8 +24,6 @@ defmodule Typesense.RequestTest do
   end
 
   test "request/5 handles jsonl responses" do
-    {:ok, _pid} = Client.start_link(@minimal_valid_config)
-
     MockHttp
     |> expect(:request, 1, fn _client, _options ->
       {:ok, %Tesla.Env{status: 200, body: "{\"success\":true}\n{\"success\":true}"}}
@@ -34,8 +37,6 @@ defmodule Typesense.RequestTest do
   end
 
   test "request/5 encodes in text/plain when given a string body" do
-    {:ok, _pid} = Client.start_link(@minimal_valid_config)
-
     MockHttp
     |> expect(:request, 3, fn _client, params ->
       assert {"Content-Type", "text/plain"} in Keyword.get(params, :headers)
@@ -72,8 +73,6 @@ defmodule Typesense.RequestTest do
   ]
 
   test "request/5 retries, marks nodes healthy/unhealthy if they fail/succeed" do
-    {:ok, _pid} = Client.start_link(@minimal_valid_config)
-
     MockHttp
     |> expect(:request, 3, fn _client, _params ->
       {:ok, %Tesla.Env{status: 500, body: "{}"}}

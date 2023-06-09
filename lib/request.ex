@@ -97,7 +97,10 @@ defmodule Typesense.Request do
 
   defp next_node(retry_node), do: retry_node
 
-  @spec maybe_json(map() | String.t()) :: String.t()
+  @spec maybe_json(map() | String.t() | nil) :: String.t()
+
+  defp maybe_json(body) when is_nil(body), do: nil
+
   defp maybe_json(body) when is_map(body) do
     Jason.encode!(body)
   end
