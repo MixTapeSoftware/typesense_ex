@@ -43,10 +43,10 @@ defmodule Typesense.Documents do
     Request.execute(:patch, path, partial_document, params)
   end
 
-  @spec update(collection_name(), document_id(), params()) :: response()
+  @spec retrieve(collection_name(), document_id(), params()) :: response()
   def retrieve(collection, document_id, params \\ []) do
     path = endpoint_path(collection, document_id)
-    Request.execute(:patch, path, "", params)
+    Request.execute(:patch, path, nil, params)
   end
 
   @spec delete(collection_name(), document_id()) :: response()

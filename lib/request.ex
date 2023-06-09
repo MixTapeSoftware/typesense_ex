@@ -7,8 +7,8 @@ defmodule Typesense.Request do
 
   @type method :: atom()
   @type path :: String.t()
-  @type body :: map() | String.t()
-  @type params :: [{atom(), atom()}] | []
+  @type body :: map() | String.t() | nil
+  @type params :: Keyword.t() | []
   @type retries :: integer()
   @type header :: {String.t(), String.t()}
   @type headers :: [header] | []
@@ -116,6 +116,10 @@ defmodule Typesense.Request do
 
   defp apply_content_type(headers, body) when is_binary(body) do
     [{"Content-Type", "text/plain"} | headers]
+  end
+
+  defp apply_content_type(headers, body) when is_nil(body) do
+    headers
   end
 
   defp maybe_apply_api_key(headers, %Client{api_key: nil}), do: headers
