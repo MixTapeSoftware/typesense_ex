@@ -21,12 +21,10 @@ defmodule Typesense.Documents do
           atom() => String.t()
         }
 
-  @documents_path "/documents"
-
-  @spec create(collection_name(), document(), params()) :: response()
-  def create(collection, document, params \\ []) do
+  @spec create(collection_name(), document()) :: response()
+  def create(collection, document) do
     path = endpoint_path(collection)
-    Request.execute(:post, path, document, params)
+    Request.execute(:post, path, document)
   end
 
   @spec upsert(collection_name(), document(), params()) :: response()
@@ -122,7 +120,7 @@ defmodule Typesense.Documents do
 
   @spec endpoint_path(collection_name()) :: String.t()
   defp endpoint_path(collection_name) do
-    "#{Collections.resource_path()}/#{collection_name}/#{@documents_path}"
+    "#{Collections.resource_path()}/#{collection_name}/documents"
   end
 
   @spec modify(collection_name(), document(), params(), atom()) :: response()
