@@ -1,4 +1,4 @@
-defmodule TypesenseCase do
+defmodule TypesenseExCase do
   @moduledoc false
   use ExUnit.CaseTemplate
 
@@ -21,6 +21,12 @@ defmodule TypesenseCase do
         # A convenience to prevent tests from being slow
         healthcheck_interval_seconds: 0
       }
+
+      def assert_misconfig(module, config, msg) do
+        Process.flag(:trap_exit, true)
+        assert {:error, msg} == apply(module, :start_link, [config])
+        assert_receive {:EXIT, _pid, ^msg}
+      end
     end
   end
 end

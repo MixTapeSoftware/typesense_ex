@@ -1,63 +1,92 @@
-defmodule Typesense.Request do
+defmodule TypesenseEx.Request do
   @moduledoc """
   Encapsulates Typesense request logic
   """
-  alias Typesense.Client
-  alias Typesense.TypesenseNode
 
-  @type method :: atom()
-  @type path :: String.t()
-  @type body :: map() | String.t() | nil
-  @type params :: Keyword.t() | []
+  alias __MODULE__
+  alias TypesenseEx.RequestConfig
+  alias TypesenseEx.RequestParams
+  alias TypesenseEx.Pool
+  alias TypesenseEx.Request
+  alias TypesenseEx.Node
+
   @type retries :: integer()
-  @type header :: {String.t(), String.t()}
-  @type headers :: [header] | []
   @type response :: {:ok, map()} | {:error, any()}
 
-  @callback execute(method(), path(), body(), params(), retries(), TypesenseNode.t() | nil) ::
-              response()
+  @derive {Inspect, only: [:request_config, :request_params, :response, :raw_response]}
 
-  @doc """
-  Handles executing requests, retrying and marking nodes as healthy/unhealthy
-  based on the results
-  """
-  def execute(method, path, body \\ %{}, params \\ [], retries \\ 0, retry_node \\ nil) do
-    client = Client.get()
+  defstruct [
+    :request_config,
+    :node,
+    retries: 0,
+    response: nil,
+    raw_response: nil,
+    request_params: nil,
+    nearest_node: nil
+  ]
 
-    node = next_node(retry_node)
+  def next_node, do: pool_impl().next_node
+  def request_config, do: config_impl().get_config
+  def set_unhealthy(node_pid, seconds), do: node_impl().set_unhealthy(node_pid, seconds)
 
-    headers =
-      []
-      |> apply_content_type(body)
-      |> maybe_apply_api_key(client)
-
-    response =
-      Typesense.Http.execute(
-        method: method,
-        url: url_for(node, path),
-        query: params,
-        body: maybe_json(body),
-        headers: headers
-      )
-
-    case response do
-      {:ok, %Tesla.Env{status: status, body: body}} when status in 1..499 ->
-        Client.set_healthy(node)
-        maybe_decode(body)
-
-      {:ok, bad_response} ->
-        retries = retries + 1
-
-        if retries <= client.num_retries do
-          milliseconds = (client.retry_interval_seconds * 1000) |> round()
-          Process.sleep(milliseconds)
-          execute(method, path, body, params, retries, node)
-        else
-          Client.set_unhealthy(node)
-          {:error, bad_response}
-        end
-    end
+  def new do
+    struct(Request, %{node: next_node(), request_config: request_config()})
   end
+
+  def execute(%{request_params: params} = request) do
+    %{request | raw_response: TypesenseEx.Http.execute(params)}
+  end
+
+  def execute(request, method, path, body \\ %{}, query \\ []) do
+    %{node: {_pid, node_config}, request_config: %{api_key: api_key}} = request
+    params = RequestParams.new(node_config, method, path, body, query, api_key)
+
+    %{request | request_params: params, raw_response: TypesenseEx.Http.execute(params)}
+  end
+
+  def handle_response(%{raw_response: raw_response} = request) do
+    response =
+      case raw_response do
+        {:ok, %Tesla.Env{status: status, body: body}} when status in 1..499 ->
+          maybe_decode(body)
+
+        {:ok, bad_response} ->
+          {:maybe_retry, bad_response}
+      end
+
+    %{request | response: response}
+  end
+
+  def maybe_retry(%Request{
+        response: {:maybe_retry, bad_response},
+        request_config: %{
+          num_retries: num_retries,
+          healthcheck_interval_seconds: retry_in
+        },
+        node: {node_pid, _config},
+        retries: retries
+      })
+      when retries >= num_retries do
+    set_unhealthy(node_pid, retry_in)
+
+    {:error, bad_response}
+  end
+
+  def maybe_retry(
+        %Request{
+          response: {:maybe_retry, _bad_response},
+          retries: retries,
+          request_config: %{
+            retry_interval_seconds: retry_interval_seconds
+          }
+        } = request
+      ) do
+    (retry_interval_seconds * 1000) |> round() |> Process.sleep()
+
+    execute(%{request | retries: retries + 1}) |> handle_response()
+  end
+
+  def maybe_retry(request), do: request
 
   defp maybe_decode(body) do
     case Jason.decode(body) do
@@ -92,42 +121,15 @@ defmodule Typesense.Request do
     end
   end
 
-  @spec next_node(TypesenseNode.t() | nil) :: TypesenseNode.t()
-  defp next_node(nil), do: Client.next_node()
-
-  defp next_node(retry_node), do: retry_node
-
-  @spec maybe_json(map() | String.t() | nil) :: String.t()
-
-  defp maybe_json(body) when is_nil(body), do: nil
-
-  defp maybe_json(body) when is_map(body) do
-    Jason.encode!(body)
+  defp pool_impl do
+    Application.get_env(:typesense_ex, :pool, Pool)
   end
 
-  defp maybe_json(body), do: body
-
-  @spec url_for(TypesenseNode.t(), path()) :: String.t()
-  defp url_for(%{protocol: protocol, host: host, port: port}, path) do
-    URI.encode("#{protocol}://#{host}:#{port}#{path}")
+  defp node_impl do
+    Application.get_env(:typesense_ex, :node, Node)
   end
 
-  @spec apply_content_type(headers(), body()) :: headers()
-  defp apply_content_type(headers, body) when is_map(body) do
-    [{"Content-Type", "application/json"} | headers]
-  end
-
-  defp apply_content_type(headers, body) when is_binary(body) do
-    [{"Content-Type", "text/plain"} | headers]
-  end
-
-  defp apply_content_type(headers, body) when is_nil(body) do
-    headers
-  end
-
-  defp maybe_apply_api_key(headers, %Client{api_key: nil}), do: headers
-
-  defp maybe_apply_api_key(headers, %Client{api_key: api_key}) do
-    [{"X-TYPESENSE-API-KEY", api_key} | headers]
+  defp config_impl do
+    Application.get_env(:typesense_ex, :request_config, RequestConfig)
   end
 end
