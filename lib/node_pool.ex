@@ -42,20 +42,29 @@ defmodule TypesenseEx.NodePool do
 
   defp init_nodes(config) do
     %ClientConfig{nodes: nodes, nearest_node: nearest_node} = config
-    add(:nearest_node, nearest_node)
 
-    [first_node | _rest] = nodes
+    if nearest_node do
+      ets_add(:nearest_node, struct(Node, nearest_node))
+    end
 
     nodes
-    |> Enum.with_index()
-    |> Enum.each(fn {node, nid} -> add({:node, nid}, node) end)
+    |> Enum.each(fn node_config ->
+      node = struct(Node, node_config)
+      ets_add({:node, node}, node)
+    end)
 
-    add(:current_node, {0, first_node})
+    if nodes() != [] do
+      [first_node | _rest] = nodes()
+
+      ets_add(:current_node, first_node)
+    end
   end
 
-  defp current_nid, do: get(:current_nid)
+  defp current_node do
+    get(:current_node)
+  end
 
-  defp nodes do
+  def nodes do
     match_spec = [{{{:node, :"$1"}, :"$2", :"$3"}, [], [{{:"$1", :"$2", :"$3"}}]}]
     :ets.select(@table, match_spec)
 
@@ -67,29 +76,28 @@ defmodule TypesenseEx.NodePool do
     add(:current_node, node)
   end
 
-  defp add_node(node) do
-    add({:node, node.id}, node)
-  end
-
   defp remove_node(node) do
-    remove({:node, node.id})
-
-    [first_node | _rest] = nodes()
-    set_current_node(first_node)
+    remove({:node, node})
   end
 
   defp remove(name) do
-    :ets.delete(@table, name)
+    GenServer.call(NodePool, {:remove, name})
   end
 
   defp add(name, value) do
-    :ets.insert(@table, {name, value, self()})
+    GenServer.call(NodePool, {:add, name, value})
   end
 
   defp get(name) do
     case :ets.lookup(@table, name) do
-      [] -> {:error, :missing}
-      [value] = results -> {:ok, value}
+      [] ->
+        {:error, :missing}
+
+      [{_key, nil, _pid}] ->
+        {:error, :missing}
+
+      [{_key, value, _pid}] ->
+        {:ok, value}
     end
   end
 
@@ -101,189 +109,65 @@ defmodule TypesenseEx.NodePool do
       end
     end
 
-    get_next_index_node = fn nodes ->
-      current_node = current_node()
-      nodes_with_index = nodes |> Enum.with_index()
+    case get(:nearest_node) do
+      {:ok, nearest_node} ->
+        nearest_node
 
-      current_index =
-        nodes_with_index
-        |> Enum.reduce(0, fn
-          {^current_node, index}, _acc ->
-            index
+      _ ->
+        with {:ok, nodes} <- maybe_get_nodes.() do
+          next_node = next_node(nodes)
+          set_current_node(next_node)
 
-          _node, acc ->
-            acc
-        end)
-
-      node_count = Enum.length(nodes)
-
-      next_index = current_index + 1
-
-      valid_next_index =
-        if next_index > node_count - 1 do
-          0
-        else
-          next_index
+          next_node
         end
-
-      {next_node, _index} =
-        Enum.find(nodes_with_index, fn {_node, index} ->
-          index == valid_next_index
-        end)
-
-      next_node
-    end
-
-    with {:ok, nodes} <- maybe_get_nodes.() do
-      get_next_index_node.(nodes)
     end
   end
 
-  def next_nid() do
-    nodes = nodes()
+  def set_unhealthy(node, milliseconds \\ 2000) do
+    with {:ok, nearest_node} <- get(:nearest_node),
+         true <- nearest_node == node do
+      remove(:nearest_node)
 
-    next_nid = current_nid + 1
-    node_count = Enum.count(nodes)
-
-    next_node_exists = Enum.any?(nodes, fn {nid, _node} -> nid == next_nid end)
-
-    if next_node_exists && next_nid <= node_count - 1 do
-      next_nid
-    else
-      0
+      Process.send_after(NodePool, {:add, :nearest_node, node}, milliseconds)
     end
-  end
 
-  defp get_node(nid) do
-    with {:ok, node} <- get({:node, nid})
-
-    case get({:node, id}) do
-      # If the node isn't there, start over
-      nil -> {:error}
-      node -> node
-    end
-  end
-
-  def set_unhealthy(nid, seconds \\ 2) do
-    node = get_node(nid)
     remove_node(node)
-
-    Process.send_after(self(), {:add, node}, seconds)
+    Process.send_after(NodePool, {:add, {:node, node}, node}, milliseconds)
   end
 
-  def handle_call({:add, node}, _from, state) do
-    %{ids: ids} = state
-    new_ids = [id | ids]
-    add()
-    {:reply, %{}, %{}}
+  defp next_node(nodes) do
+    {:ok, current_node} = current_node()
+
+    current_index = Enum.find_index(nodes, fn node -> node == current_node end)
+
+    current_index = current_index || 0
+
+    next_index = rem(current_index + 1, length(nodes))
+
+    {next_node, _} = nodes |> Enum.with_index() |> Enum.at(next_index)
+
+    next_node
   end
 
-  def handle_call({:remove, id}, _from, state) do
-    %{ids: ids} = state
-    Registry.unregister(TypesenseEx.NodeRegistry, id)
-    new_ids = Enum.reject(ids, &(&1 == id))
-
-    # We reset current_id to force next_node to pick a valid node from ids
-    {:reply, new_ids, %{state | ids: new_ids, current_id: nil}}
+  defp ets_add(name, value) do
+    :ets.insert(@table, {name, value, self()})
   end
 
-  def handle_call(:ids, _from, state) do
-    %{ids: ids} = state
-    {:reply, ids, state}
+  def handle_call({:add, name, value}, _from, state) do
+    ets_add(name, value)
+    {:reply, %{}, state}
   end
 
-  # TODO: account for nearest_node
-  # def handle_call(:next_node, _from, %{ids: ids} = state) when ids == [] do
-  #   {:reply, {nil, nil}, %{state | current_id: nil}}
-  # end
-
-  def handle_call(:next_node, _from, state) do
-    nid = next_nid(state)
-
-    node =
-      case Registry.lookup(TypesenseEx.NodeRegistry, nid) do
-        [{_pid, node}] -> node
-        [] -> nil
-      end
-
-    new_state =
-      if nid == @nearest_node do
-        state
-      else
-        %{state | current_id: nid}
-      end
-
-    {:reply, {nid, node}, new_state}
+  def handle_call({:remove, name}, _from, state) do
+    :ets.delete(@table, name)
+    {:reply, %{}, state}
   end
 
-  defp init_nodes(config) do
-    %ClientConfig{nodes: node_configs, nearest_node: nearest_node_config} = config
+  def handle_info({:add, key, value}, state) do
+    ets_add(key, value)
 
-    all_node_configs =
-      if is_nil(nearest_node_config) do
-        node_configs
-      else
-        [nearest_node_config | node_configs]
-      end
-
-    all_node_configs
-    |> Enum.uniq()
-    |> Enum.with_index()
-    |> Enum.map(fn {node_config, i} ->
-      node = to_node(node_config)
-      next_id = i + 1
-
-      nid =
-        if node_config == nearest_node_config do
-          @nearest_node
-        else
-          next_id
-        end
-
-      {:ok, _} = Registry.register(TypesenseEx.NodeRegistry, nid, node)
-
-      if nid == @nearest_node do
-      end
-
-      nid
-    end)
+    {:noreply, state}
   end
-
-  defp next_nid(state) do
-    %{ids: ids, current_id: current_id} = state
-    nearest_node = nearest_node(ids)
-
-    if nearest_node do
-      nearest_node
-    else
-      next_nid(current_id, ids)
-    end
-  end
-
-  defp next_nid(nil, ids) do
-    nodes(ids) |> List.first()
-  end
-
-  defp next_nid(current_id, ids) do
-    node_count = node_count(ids)
-    rem(current_id, node_count) + 1
-  end
-
-  defp node_count(ids) do
-    nodes(ids) |> Enum.count()
-  end
-
-  defp nodes(ids) do
-    Enum.filter(ids, &(&1 !== @nearest_node))
-  end
-
-  defp nearest_node(ids) do
-    Enum.find(ids, &(&1 == @nearest_node))
-  end
-
-  defp to_node(nil), do: %Node{}
-
-  defp to_node(config), do: Node.new(config)
 
   defp to_config(config) do
     config

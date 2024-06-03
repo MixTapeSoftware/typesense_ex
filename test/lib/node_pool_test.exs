@@ -2,7 +2,6 @@ defmodule TypesenseEx.NodePoolTest do
   use ExUnit.Case, async: true
 
   alias TypesenseEx.Node
-  alias TypesenseEx.NodeSupervisor
   alias TypesenseEx.NodePool
 
   describe "without a nearest node" do
@@ -14,7 +13,7 @@ defmodule TypesenseEx.NodePoolTest do
         ]
       }
 
-      pid = start_link_supervised!({NodeSupervisor, nodes_configs})
+      pid = start_link_supervised!({NodePool, nodes_configs})
       %{supervisor_pid: pid}
     end
 
@@ -23,58 +22,49 @@ defmodule TypesenseEx.NodePoolTest do
     end
 
     test "next_node/0" do
-      assert {1,
-              %Node{
-                host: "localhost",
-                port: "8109",
-                protocol: "http",
-                last_used: last_used,
-                marked_unhealthy_at: nil
-              }} = NodePool.next_node()
+      assert %Node{
+               host: "localhost",
+               port: "8109",
+               protocol: "http"
+             } = NodePool.next_node()
 
-      assert DateTime.utc_now() |> DateTime.to_date() == last_used |> DateTime.to_date()
+      assert %Node{
+               host: "localhost",
+               port: "8108",
+               protocol: "http"
+             } = NodePool.next_node()
 
-      assert {2,
-              %TypesenseEx.Node{
-                host: "localhost",
-                marked_unhealthy_at: nil,
-                port: "8108",
-                protocol: "http",
-                id: nil,
-                is_nearest: false,
-                last_used: last_used
-              }} = NodePool.next_node()
-
-      assert DateTime.utc_now() |> DateTime.to_date() == last_used |> DateTime.to_date()
+      assert %Node{
+               host: "localhost",
+               port: "8109",
+               protocol: "http"
+             } = NodePool.next_node()
     end
 
     test "set_unhealthy/2" do
-      {1, %Node{host: "localhost", port: "8109", protocol: "http", marked_unhealthy_at: nil}} =
-        NodePool.next_node()
+      %{host: "localhost", port: "8109", protocol: "http"} = node = NodePool.next_node()
 
-      NodePool.set_unhealthy(1, 10)
+      NodePool.set_unhealthy(node, 10)
 
-      assert {2,
-              %Node{host: "localhost", port: "8108", protocol: "http", marked_unhealthy_at: nil}} =
-               NodePool.next_node()
+      assert %Node{host: "localhost", port: "8108", protocol: "http"} =
+               node_two = NodePool.next_node()
 
-      NodePool.set_unhealthy(2, 10)
+      NodePool.set_unhealthy(node_two, 10)
 
-      assert {nil, nil} = NodePool.next_node()
+      assert {:error, :no_healthy_nodes_available} = NodePool.next_node()
     end
   end
 
   describe "with a nearest node" do
     setup do
       nodes_configs = %{
-        nearest_node: %{host: "localhost", port: "8108", protocol: "http"},
+        nearest_node: %{host: "localhost", port: "8110", protocol: "http"},
         nodes: [
-          %{host: "localhost", port: "8109", protocol: "http"},
-          %{host: "localhost", port: "8108", protocol: "http"}
+          %{host: "localhost", port: "8109", protocol: "http"}
         ]
       }
 
-      pid = start_link_supervised!({NodeSupervisor, nodes_configs})
+      pid = start_link_supervised!({NodePool, nodes_configs})
       %{supervisor_pid: pid}
     end
 
@@ -83,43 +73,43 @@ defmodule TypesenseEx.NodePoolTest do
     end
 
     test "next_node/0" do
-      assert {:nearest_node,
-              %Node{
-                host: "localhost",
-                port: "8108",
-                protocol: "http",
-                last_used: last_used,
-                marked_unhealthy_at: nil
-              }} = NodePool.next_node()
+      assert %Node{
+               host: "localhost",
+               port: "8110",
+               protocol: "http"
+             } = NodePool.next_node()
 
-      assert DateTime.utc_now() |> DateTime.to_date() == last_used |> DateTime.to_date()
-
-      assert {:nearest_node,
-              %TypesenseEx.Node{
-                host: "localhost",
-                marked_unhealthy_at: nil,
-                port: "8108",
-                protocol: "http",
-                id: nil,
-                is_nearest: false,
-                last_used: last_used
-              }} = NodePool.next_node()
-
-      assert DateTime.utc_now() |> DateTime.to_date() == last_used |> DateTime.to_date()
+      assert %Node{
+               host: "localhost",
+               port: "8110",
+               protocol: "http"
+             } = NodePool.next_node()
     end
 
     test "set_unhealthy/2" do
-      {node_id, _node} = NodePool.next_node()
+      assert %{
+               host: "localhost",
+               port: "8110",
+               protocol: "http"
+             } = nearest_node = NodePool.next_node()
 
-      NodePool.set_unhealthy(node_id, 10)
+      NodePool.set_unhealthy(nearest_node, 5)
 
-      assert {2,
-              %Node{host: "localhost", port: "8109", protocol: "http", marked_unhealthy_at: nil}} =
+      assert %Node{host: "localhost", port: "8109", protocol: "http"} =
+               node_8109 =
                NodePool.next_node()
 
-      NodePool.set_unhealthy(2, 10)
+      NodePool.set_unhealthy(node_8109, 5)
 
-      assert {nil, nil} = NodePool.next_node()
+      assert {:error, :no_healthy_nodes_available} = NodePool.next_node()
+
+      Process.sleep(20)
+
+      assert %Node{
+               host: "localhost",
+               port: "8110",
+               protocol: "http"
+             } = NodePool.next_node()
     end
   end
 
@@ -130,7 +120,7 @@ defmodule TypesenseEx.NodePoolTest do
         nodes: []
       }
 
-      pid = start_link_supervised!({NodeSupervisor, nodes_configs})
+      pid = start_link_supervised!({NodePool, nodes_configs})
       %{supervisor_pid: pid}
     end
 
@@ -139,37 +129,26 @@ defmodule TypesenseEx.NodePoolTest do
     end
 
     test "next_node/0" do
-      assert {:nearest_node,
-              %Node{
-                host: "localhost",
-                port: "8108",
-                protocol: "http",
-                last_used: last_used,
-                marked_unhealthy_at: nil
-              }} = NodePool.next_node()
+      assert %Node{
+               host: "localhost",
+               port: "8108",
+               protocol: "http"
+             } = NodePool.next_node()
 
-      assert DateTime.utc_now() |> DateTime.to_date() == last_used |> DateTime.to_date()
+      assert %Node{
+               host: "localhost",
+               port: "8108",
+               protocol: "http"
+             } = NodePool.next_node()
 
-      assert {:nearest_node,
-              %TypesenseEx.Node{
-                host: "localhost",
-                marked_unhealthy_at: nil,
-                port: "8108",
-                protocol: "http",
-                id: nil,
-                is_nearest: false,
-                last_used: last_used
-              }} = NodePool.next_node()
-
-      assert DateTime.utc_now() |> DateTime.to_date() == last_used |> DateTime.to_date()
     end
 
     test "set_unhealthy/2" do
-      {node_id, _node} = NodePool.next_node()
+      %TypesenseEx.Node{host: "localhost", port: "8108", protocol: "http"} = node = NodePool.next_node()
 
-      NodePool.set_unhealthy(node_id, 10)
+      NodePool.set_unhealthy(node, 10)
 
-      assert {nil, nil} = NodePool.next_node()
+      assert {:error, :no_healthy_nodes_available} = NodePool.next_node()
     end
   end
 end
