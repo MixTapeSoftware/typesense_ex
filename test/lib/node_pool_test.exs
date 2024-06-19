@@ -1,8 +1,11 @@
 defmodule TypesenseEx.NodePoolTest do
   use ExUnit.Case, async: true
+  use Mimic
 
   alias TypesenseEx.Node
   alias TypesenseEx.NodePool
+  alias TypesenseEx.NodeStore
+  alias TypesenseEx.OrderedStore
 
   describe "without a nearest node" do
     setup do
@@ -22,36 +25,60 @@ defmodule TypesenseEx.NodePoolTest do
     end
 
     test "next_node/0" do
-      assert %Node{
-               host: "localhost",
-               port: "8109",
-               protocol: "http"
-             } = NodePool.next_node()
+      assert {1,
+              %Node{
+                host: "localhost",
+                port: "8108",
+                protocol: "http"
+              }} = NodePool.next_node()
 
-      assert %Node{
-               host: "localhost",
-               port: "8108",
-               protocol: "http"
-             } = NodePool.next_node()
+      assert {0,
+              %Node{
+                host: "localhost",
+                port: "8109",
+                protocol: "http"
+              }} = NodePool.next_node()
 
-      assert %Node{
-               host: "localhost",
-               port: "8109",
-               protocol: "http"
-             } = NodePool.next_node()
+      assert {1,
+              %Node{
+                host: "localhost",
+                port: "8108",
+                protocol: "http"
+              }} = NodePool.next_node()
     end
 
     test "set_unhealthy/2" do
-      %{host: "localhost", port: "8109", protocol: "http"} = node = NodePool.next_node()
+      {1,
+       %Node{
+         host: "localhost",
+         port: "8108",
+         protocol: "http"
+       }} =
+        node = NodePool.next_node()
 
       NodePool.set_unhealthy(node, 1)
 
-      assert %Node{host: "localhost", port: "8108", protocol: "http"} =
+      assert {0,
+              %Node{
+                host: "localhost",
+                port: "8109",
+                protocol: "http"
+              }} =
                node_two = NodePool.next_node()
 
       NodePool.set_unhealthy(node_two, 1)
 
-      assert {:error, :no_healthy_nodes_available} = NodePool.next_node()
+      assert {:error, :missing} = NodePool.next_node()
+
+      Process.sleep(5)
+
+      assert {1,
+              %Node{
+                host: "localhost",
+                port: "8108",
+                protocol: "http"
+              }} =
+               NodePool.next_node()
     end
   end
 
@@ -73,49 +100,59 @@ defmodule TypesenseEx.NodePoolTest do
     end
 
     test "next_node/0" do
-      assert %Node{
-               host: "localhost",
-               port: "8110",
-               protocol: "http"
-             } = NodePool.next_node()
+      assert {:nearest_node,
+              %Node{
+                host: "localhost",
+                port: "8110",
+                protocol: "http"
+              }} = NodePool.next_node()
 
-      assert %Node{
-               host: "localhost",
-               port: "8110",
-               protocol: "http"
-             } = NodePool.next_node()
+      assert {:nearest_node,
+              %Node{
+                host: "localhost",
+                port: "8110",
+                protocol: "http"
+              }} = NodePool.next_node()
     end
 
     test "set_unhealthy/2" do
-      assert %Node{
-               host: "localhost",
-               port: "8110",
-               protocol: "http"
-             } = nearest_node = NodePool.next_node()
+      assert {:nearest_node,
+              %Node{
+                host: "localhost",
+                port: "8110",
+                protocol: "http"
+              }} = nearest_node = NodePool.next_node()
 
       NodePool.set_unhealthy(nearest_node, 1)
 
-      assert %Node{host: "localhost", port: "8109", protocol: "http"} =
+      assert {0,
+              %Node{
+                host: "localhost",
+                port: "8109",
+                protocol: "http"
+              }} =
                node_8109 =
                NodePool.next_node()
 
       NodePool.set_unhealthy(node_8109, 5)
 
-      assert {:error, :no_healthy_nodes_available} = NodePool.next_node()
+      assert {:error, :missing} = NodePool.next_node()
 
       Process.sleep(10)
 
-      assert %Node{
-               host: "localhost",
-               port: "8110",
-               protocol: "http"
-             } = NodePool.next_node()
+      assert {:nearest_node,
+              %Node{
+                host: "localhost",
+                port: "8110",
+                protocol: "http"
+              }} = NodePool.next_node()
 
-      assert %Node{
-               host: "localhost",
-               port: "8110",
-               protocol: "http"
-             } = NodePool.next_node()
+      assert {:nearest_node,
+              %Node{
+                host: "localhost",
+                port: "8110",
+                protocol: "http"
+              }} = NodePool.next_node()
     end
   end
 
@@ -135,30 +172,38 @@ defmodule TypesenseEx.NodePoolTest do
     end
 
     test "next_node/0" do
-      assert %Node{
-               host: "localhost",
-               port: "8177",
-               protocol: "http"
-             } = NodePool.next_node()
+      assert {:nearest_node,
+              %Node{
+                host: "localhost",
+                port: "8177",
+                protocol: "http"
+              }} = NodePool.next_node()
 
-      assert %Node{
-               host: "localhost",
-               port: "8177",
-               protocol: "http"
-             } = NodePool.next_node()
+      assert {:nearest_node,
+              %Node{
+                host: "localhost",
+                port: "8177",
+                protocol: "http"
+              }} = NodePool.next_node()
     end
 
     test "set_unhealthy/2" do
-      %TypesenseEx.Node{host: "localhost", port: "8177", protocol: "http"} =
+      {:nearest_node,
+       %Node{
+         host: "localhost",
+         port: "8177",
+         protocol: "http"
+       }} =
         node = NodePool.next_node()
 
       # These tests run in a random order
       # So, we set this to a long timeout
       # so that Process.send_after doesn't
       # pollute another test's ETS table
-      NodePool.set_unhealthy(node, 100)
+      # TODO: explore mocking strategies here
+      NodePool.set_unhealthy(node, 10)
 
-      assert {:error, :no_healthy_nodes_available} = NodePool.next_node()
+      assert {:error, :missing} = NodePool.next_node()
     end
   end
 end

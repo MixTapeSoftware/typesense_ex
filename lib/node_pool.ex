@@ -1,21 +1,12 @@
 defmodule TypesenseEx.NodePool do
+  @moduledoc """
+  A pool that returns a round-robbin response of typesense nodes
+  """
   use GenServer
   alias __MODULE__
   alias TypesenseEx.ClientConfig
   alias TypesenseEx.Node
-
-  # TODO: Instead of removing nodes, mark them as unhealthy
-  # This way, we can use an unhealthy node in case no healthy nodes are available
-
-  @doc """
-  A special Registry ID for the nearest node
-
-  We want to return the nearest node every time as long as it is
-  in the Registry (that is, if it has been set and hasn't been
-  put in time-out due it being marked unhealthy). So, we have
-  a single handle on it.
-  """
-  @table :typesense_ex_node_registry
+  alias TypesenseEx.NodeStore, as: Store
 
   def start_link(config) do
     case to_config(config) do
@@ -28,149 +19,108 @@ defmodule TypesenseEx.NodePool do
   end
 
   def init(config) do
-    init_bucket()
+    Store.init()
+
     init_nodes(config)
     {:ok, []}
   end
 
-  def init_bucket() do
-    if :ets.info(@table, :size) === :undefined do
-      :ets.new(@table, [:set, :protected, :named_table, read_concurrency: true])
-    end
-  end
+  @doc """
+  Get the next available node
 
-  defp init_nodes(config) do
-    %ClientConfig{nodes: nodes, nearest_node: nearest_node} = config
-
-    if nearest_node do
-      store_add(:nearest_node, struct(Node, nearest_node))
-    end
-
-    nodes
-    |> Enum.each(fn node_config ->
-      node = struct(Node, node_config)
-      store_add({:node, node}, node)
-    end)
-
-    if nodes() != [] do
-      [first_node | _rest] = nodes()
-
-      store_add(:current_node, first_node)
-    end
-  end
-
-  defp current_node do
-    get(:current_node)
-  end
-
-  def nodes do
-    match_spec = [{{{:node, :"$1"}, :"$2", :"$3"}, [], [{{:"$1", :"$2", :"$3"}}]}]
-    :ets.select(@table, match_spec)
-
-    :ets.select(@table, match_spec) |> Enum.map(fn {_nid, node, _pid} -> node end)
-  end
-
-  defp set_current_node(node) do
-    remove(:current_node)
-    add(:current_node, node)
-  end
-
-  defp remove_node(node) do
-    remove({:node, node})
-  end
-
-  defp remove(name) do
-    GenServer.call(NodePool, {:remove, name})
-  end
-
-  defp add(name, value) do
-    GenServer.call(NodePool, {:add, name, value})
-  end
-
-  defp get(name) do
-    case :ets.lookup(@table, name) do
-      [] ->
-        {:error, :missing}
-
-      [{_key, nil, _pid}] ->
-        {:error, :missing}
-
-      [{_key, value, _pid}] ->
-        {:ok, value}
-    end
-  end
-
+  Each request to this function increments the pointer globally.
+  """
   def next_node do
-    maybe_get_nodes = fn ->
-      case nodes() do
-        [] -> {:error, :no_healthy_nodes_available}
-        nodes -> {:ok, nodes}
-      end
-    end
-
-    case get(:nearest_node) do
+    case Store.get(:nearest_node) do
       {:ok, nearest_node} ->
-        nearest_node
+        {:nearest_node, nearest_node}
 
-      _ ->
-        with {:ok, nodes} <- maybe_get_nodes.() do
-          next_node = next_node(nodes)
-          set_current_node(next_node)
-
-          next_node
-        end
+      {:error, :missing} ->
+        get_and_set_next_node()
     end
   end
 
-  def set_unhealthy(node, milliseconds \\ 2000) do
-    with {:ok, nearest_node} <- get(:nearest_node),
-         true <- nearest_node == node do
-      remove(:nearest_node)
+  def set_unhealthy(node, milliseconds \\ 2000)
 
-      Process.send_after(NodePool, {:add, :nearest_node, node}, milliseconds)
-    end
+  def set_unhealthy({:nearest_node, node}, milliseconds) do
+    remove(:nearest_node)
 
-    remove_node(node)
-    Process.send_after(NodePool, {:add, {:node, node}, node}, milliseconds)
+    Process.send_after(NodePool, {:add, :nearest_node, node}, milliseconds)
   end
 
-  defp next_node(nodes) do
-    {:ok, current_node} = current_node()
-
-    current_index = Enum.find_index(nodes, fn node -> node == current_node end)
-
-    current_index = current_index || 0
-
-    next_index = rem(current_index + 1, length(nodes))
-
-    {next_node, _} = nodes |> Enum.with_index() |> Enum.at(next_index)
-
-    next_node
+  def set_unhealthy({id, node}, milliseconds) do
+    remove(id)
+    add_in(id, node, milliseconds)
   end
 
-  defp store_add(name, value) do
-    :ets.insert(@table, {name, value, self()})
-  end
-
-  def handle_call({:add, name, value}, _from, state) do
-    store_add(name, value)
+  def handle_call({:remove, key}, _from, state) do
+    Store.remove(key)
     {:reply, %{}, state}
   end
 
-  def handle_call({:remove, name}, _from, state) do
-    :ets.delete(@table, name)
+  def handle_call({:replace, key, value}, _from, state) do
+    Store.replace(key, value)
     {:reply, %{}, state}
   end
 
   def handle_info({:add, key, value}, state) do
-    store_add(key, value)
+    Store.add(key, value)
 
     {:noreply, state}
+  end
+
+  defp get_and_set_next_node do
+    with {:ok, next_node} <- Store.next_node() do
+      set_current_node(next_node)
+      next_node
+    end
   end
 
   defp to_config(config) do
     config
     |> ClientConfig.new()
     |> ClientConfig.validate()
+  end
+
+  defp init_nodes(config) do
+    %ClientConfig{nodes: nodes, nearest_node: nearest_node} = config
+
+    if nearest_node do
+      Store.add(:nearest_node, struct(Node, nearest_node))
+    end
+
+    nodes
+    |> Enum.with_index()
+    |> Enum.each(fn {node_config, id} ->
+      node = struct(Node, node_config)
+      Store.add(id, node)
+    end)
+
+    current_node =
+      case Store.first_node() do
+        {:ok, node} -> node
+        missing -> missing
+      end
+
+    Store.add(:current_node, current_node)
+  end
+
+  defp set_current_node(node) do
+    replace(:current_node, node)
+  end
+
+  # Our ordered set tables are protected, so all mutations
+  # must happen in-process. Reads are concurrent and public.
+
+  defp add_in(id, node, milliseconds) do
+    Process.send_after(NodePool, {:add, id, node}, milliseconds)
+  end
+
+  defp replace(key, value) do
+    GenServer.call(NodePool, {:replace, key, value})
+  end
+
+  defp remove(key) do
+    GenServer.call(NodePool, {:remove, key})
   end
 end
