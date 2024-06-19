@@ -15,7 +15,6 @@ defmodule TypesenseEx.NodePool do
   put in time-out due it being marked unhealthy). So, we have
   a single handle on it.
   """
-  @nearest_node :nearest_node
   @table :typesense_ex_node_registry
 
   def start_link(config) do
@@ -36,7 +35,7 @@ defmodule TypesenseEx.NodePool do
 
   def init_bucket() do
     if :ets.info(@table, :size) === :undefined do
-      :ets.new(@table, [:set, :protected, :named_table])
+      :ets.new(@table, [:set, :protected, :named_table, read_concurrency: true])
     end
   end
 
@@ -44,19 +43,19 @@ defmodule TypesenseEx.NodePool do
     %ClientConfig{nodes: nodes, nearest_node: nearest_node} = config
 
     if nearest_node do
-      ets_add(:nearest_node, struct(Node, nearest_node))
+      store_add(:nearest_node, struct(Node, nearest_node))
     end
 
     nodes
     |> Enum.each(fn node_config ->
       node = struct(Node, node_config)
-      ets_add({:node, node}, node)
+      store_add({:node, node}, node)
     end)
 
     if nodes() != [] do
       [first_node | _rest] = nodes()
 
-      ets_add(:current_node, first_node)
+      store_add(:current_node, first_node)
     end
   end
 
@@ -149,12 +148,12 @@ defmodule TypesenseEx.NodePool do
     next_node
   end
 
-  defp ets_add(name, value) do
+  defp store_add(name, value) do
     :ets.insert(@table, {name, value, self()})
   end
 
   def handle_call({:add, name, value}, _from, state) do
-    ets_add(name, value)
+    store_add(name, value)
     {:reply, %{}, state}
   end
 
@@ -164,7 +163,7 @@ defmodule TypesenseEx.NodePool do
   end
 
   def handle_info({:add, key, value}, state) do
-    ets_add(key, value)
+    store_add(key, value)
 
     {:noreply, state}
   end
