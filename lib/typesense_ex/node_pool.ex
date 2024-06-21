@@ -2,27 +2,39 @@ defmodule TypesenseEx.NodePool do
   @moduledoc """
   A pool that returns a round-robbin response of typesense nodes
   """
+  use Drops.Contract
+
   use GenServer
   alias __MODULE__
-  alias TypesenseEx.ClientConfig
   alias TypesenseEx.Node
   alias TypesenseEx.NodeStore, as: Store
 
-  def start_link(config) do
-    case to_config(config) do
+  defstruct [:nearest_node, nodes: []]
+
+  defmodule Types.Node do
+    use Drops.Type, %{
+      required(:port) => integer(),
+      required(:host) => string(),
+      required(:protocol) => string(in?: ["http", "https"])
+    }
+  end
+
+  schema do
+    %{
+      optional(:nearest_node) => Types.Node,
+      optional(:nodes) => list(Types.Node)
+    }
+  end
+
+  def start_link(params \\ %{}) do
+    case NodePool.conform(params) do
       {:ok, config} ->
-        GenServer.start_link(NodePool, config, name: NodePool)
+        node_pool = struct(NodePool, config)
+        GenServer.start_link(NodePool, node_pool, name: NodePool)
 
       errors ->
         errors
     end
-  end
-
-  def init(config) do
-    Store.init()
-
-    init_nodes(config)
-    {:ok, []}
   end
 
   @doc """
@@ -32,37 +44,51 @@ defmodule TypesenseEx.NodePool do
   """
   def next_node do
     case Store.get(:nearest_node) do
-      {:ok, nearest_node} ->
-        {:nearest_node, nearest_node}
-
-      {:error, :missing} ->
-        get_and_set_next_node()
+      {:ok, nearest_node} -> nearest_node
+      {:error, :missing} -> get_and_set_next_node()
     end
   end
 
-  def set_unhealthy(node, milliseconds \\ 2000)
-
-  def set_unhealthy({:nearest_node, node}, milliseconds) do
-    remove(:nearest_node)
-
-    Process.send_after(NodePool, {:add, :nearest_node, node}, milliseconds)
-  end
-
-  def set_unhealthy({id, node}, milliseconds) do
+  def set_unhealthy(%Store.Node{id: id, node: node}, milliseconds \\ 2000) do
     remove(id)
-    add_in(id, node, milliseconds)
+    add_after(id, node, milliseconds)
   end
 
+  @doc """
+  Adds a node with a given id into the pool.
+
+  Note: `:current_node` and `:nearest_node` may be set here as well
+  by passing one of these atoms as the id.
+  """
+  def add_after(id, node, milliseconds) do
+    Process.send_after(NodePool, {:add, id, node}, milliseconds)
+  end
+
+  def remove(key) do
+    GenServer.call(NodePool, {:remove, key})
+  end
+
+  @impl true
+  def init(node_pool) do
+    Store.init()
+
+    init_nodes(node_pool)
+    {:ok, []}
+  end
+
+  @impl true
   def handle_call({:remove, key}, _from, state) do
     Store.remove(key)
     {:reply, %{}, state}
   end
 
+  @impl true
   def handle_call({:replace, key, value}, _from, state) do
     Store.replace(key, value)
     {:reply, %{}, state}
   end
 
+  @impl true
   def handle_info({:add, key, value}, state) do
     Store.add(key, value)
 
@@ -76,16 +102,10 @@ defmodule TypesenseEx.NodePool do
     end
   end
 
-  defp to_config(config) do
-    config
-    |> ClientConfig.new()
-    |> ClientConfig.validate()
-  end
+  defp init_nodes(node_pool) do
+    %NodePool{nodes: nodes, nearest_node: nearest_node} = node_pool
 
-  defp init_nodes(config) do
-    %ClientConfig{nodes: nodes, nearest_node: nearest_node} = config
-
-    if nearest_node do
+    if not is_nil(nearest_node) do
       Store.add(:nearest_node, struct(Node, nearest_node))
     end
 
@@ -99,7 +119,7 @@ defmodule TypesenseEx.NodePool do
     current_node =
       case Store.first_node() do
         {:ok, node} -> node
-        missing -> missing
+        {:error, :missing} -> nil
       end
 
     Store.add(:current_node, current_node)
@@ -109,18 +129,7 @@ defmodule TypesenseEx.NodePool do
     replace(:current_node, node)
   end
 
-  # Our ordered set tables are protected, so all mutations
-  # must happen in-process. Reads are concurrent and public.
-
-  defp add_in(id, node, milliseconds) do
-    Process.send_after(NodePool, {:add, id, node}, milliseconds)
-  end
-
   defp replace(key, value) do
     GenServer.call(NodePool, {:replace, key, value})
-  end
-
-  defp remove(key) do
-    GenServer.call(NodePool, {:remove, key})
   end
 end

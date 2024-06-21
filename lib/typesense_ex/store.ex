@@ -1,4 +1,4 @@
-defmodule TypesenseEx.OrderedStore do
+defmodule TypesenseEx.Store do
   @moduledoc """
   A wrapper around an ordered ets store
   """
@@ -40,7 +40,7 @@ defmodule TypesenseEx.OrderedStore do
     case :ets.lookup(table, key) do
       [] -> @missing_error
       [{_key, nil, _pid}] -> @missing_error
-      [{_key, value, _pid}] -> {:ok, value}
+      [{key, value, _pid}] -> {:ok, {key, value}}
     end
   end
 
