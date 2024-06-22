@@ -23,6 +23,7 @@ defmodule TypesenseEx.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:drops, "~> 0.2.0"},
       {:jason, "~> 1.4"},
       {:mimic, "~> 1.8", only: :test},

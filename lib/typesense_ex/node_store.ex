@@ -1,6 +1,7 @@
 defmodule TypesenseEx.NodeStore do
-  use Drops.Contract
-
+  @moduledoc """
+  A Typesense node wrapper around Store
+  """
   alias TypesenseEx.Store
 
   @node_registry_table :typesense_ex_node_registry
@@ -11,23 +12,13 @@ defmodule TypesenseEx.NodeStore do
     :healthcheck_interval
   ]
 
-  defmodule Types.Node do
-    use Drops.Type, %{
-      required(:port) => integer(),
-      required(:host) => string(),
-      required(:protocol) => string(in?: ["http", "https"])
-    }
-  end
-
-  schema do
-    %{
-      optional(:healthcheck_interval) => integer(gt?: 0),
-      optional(:nearest_node) => Types.Node,
-      optional(:nodes) => list(Types.Node)
-    }
-  end
-
   defmodule Node do
+    @moduledoc """
+    A Node from the NodeStore
+
+    Returned from next_node() and the like. The `id` helps us
+    pick the next Node or set a Node as unhealthy.
+    """
     defstruct [:id, :node]
   end
 
@@ -59,9 +50,8 @@ defmodule TypesenseEx.NodeStore do
   end
 
   def next_node() do
-    with {:ok, current_node} <- maybe_get_current_node(),
-         {:ok, next_node} <- next_node(current_node) do
-      {:ok, next_node}
+    with {:ok, current_node} <- maybe_get_current_node() do
+      next_node(current_node)
     end
   end
 

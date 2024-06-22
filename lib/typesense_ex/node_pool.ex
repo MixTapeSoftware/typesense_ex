@@ -3,15 +3,36 @@ defmodule TypesenseEx.NodePool do
   A pool that returns a round-robbin response of typesense nodes
   """
 
+  use Drops.Contract
   use GenServer
+
   alias __MODULE__
   alias TypesenseEx.Node
   alias TypesenseEx.NodeStore, as: Store
 
   defstruct [:nearest_node, nodes: [], healthcheck_interval: 2_000]
 
+  defmodule Types.Node do
+    @moduledoc """
+    A Drops Type module
+    """
+    use Drops.Type, %{
+      required(:port) => integer(),
+      required(:host) => string(),
+      required(:protocol) => string(in?: ["http", "https"])
+    }
+  end
+
+  schema do
+    %{
+      optional(:healthcheck_interval) => integer(gt?: 0),
+      optional(:nearest_node) => Types.Node,
+      optional(:nodes) => list(Types.Node)
+    }
+  end
+
   def start_link(params \\ %{}) do
-    case Store.conform(params) do
+    case NodePool.conform(params) do
       {:ok, config} ->
         node_pool = struct(NodePool, config)
         GenServer.start_link(NodePool, node_pool, name: NodePool)

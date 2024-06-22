@@ -105,7 +105,7 @@ defmodule TypesenseEx.NodePoolTest do
 
   describe "with an empty configuration" do
     setup do
-      pid = start_link_supervised!({NodePool, %{}})
+      pid = start_link_supervised!({NodePool, %{healthcheck_interval: 1}})
       %{supervisor_pid: pid}
     end
 
@@ -116,7 +116,7 @@ defmodule TypesenseEx.NodePoolTest do
     test "add and remove nodes after boot" do
       assert {:error, :missing} == NodePool.next_node()
 
-      NodePool.add_after(0, @node, 0)
+      NodePool.add_after(0, @node)
 
       Process.sleep(10)
 
@@ -132,6 +132,7 @@ defmodule TypesenseEx.NodePoolTest do
   describe "without a nearest node" do
     setup do
       node_configs = %{
+        healthcheck_interval: 1,
         nodes: [
           %{host: "localhost", port: 8109, protocol: "http"},
           %{host: "localhost", port: 8108, protocol: "http"}
@@ -186,7 +187,7 @@ defmodule TypesenseEx.NodePoolTest do
              } =
                node = NodePool.next_node()
 
-      NodePool.set_unhealthy(node, 1)
+      NodePool.set_unhealthy(node)
 
       assert %Store.Node{
                id: 0,
@@ -198,7 +199,7 @@ defmodule TypesenseEx.NodePoolTest do
              } =
                node_two = NodePool.next_node()
 
-      NodePool.set_unhealthy(node_two, 1)
+      NodePool.set_unhealthy(node_two)
 
       assert {:error, :missing} = NodePool.next_node()
 
@@ -219,6 +220,7 @@ defmodule TypesenseEx.NodePoolTest do
   describe "with a nearest node" do
     setup do
       node_configs = %{
+        healthcheck_interval: 1,
         nearest_node: %{host: "localhost", port: 8110, protocol: "http"},
         nodes: [
           %{host: "localhost", port: 8109, protocol: "http"}
@@ -234,7 +236,7 @@ defmodule TypesenseEx.NodePoolTest do
     end
 
     test "next_node/0" do
-      assert %TypesenseEx.NodeStore.Node{
+      assert %Store.Node{
                id: :nearest_node,
                node: %Node{
                  host: "localhost",
@@ -243,7 +245,7 @@ defmodule TypesenseEx.NodePoolTest do
                }
              } = NodePool.next_node()
 
-      assert %TypesenseEx.NodeStore.Node{
+      assert %Store.Node{
                id: :nearest_node,
                node: %Node{
                  host: "localhost",
@@ -254,7 +256,7 @@ defmodule TypesenseEx.NodePoolTest do
     end
 
     test "set_unhealthy/2" do
-      nearest_node = %TypesenseEx.NodeStore.Node{
+      nearest_node = %Store.Node{
         id: :nearest_node,
         node: %Node{
           host: "localhost",
@@ -265,7 +267,7 @@ defmodule TypesenseEx.NodePoolTest do
 
       assert nearest_node == NodePool.next_node()
 
-      NodePool.set_unhealthy(nearest_node, 1)
+      NodePool.set_unhealthy(nearest_node)
 
       %Store.Node{
         id: 0,
@@ -278,7 +280,7 @@ defmodule TypesenseEx.NodePoolTest do
         node_8109 =
         NodePool.next_node()
 
-      NodePool.set_unhealthy(node_8109, 5)
+      NodePool.set_unhealthy(node_8109)
 
       assert {:error, :missing} = NodePool.next_node()
 
@@ -286,12 +288,14 @@ defmodule TypesenseEx.NodePoolTest do
 
       assert nearest_node == NodePool.next_node()
 
-      # assert {:nearest_node,
-      #         %Node{
-      #           host: "localhost",
-      #           port: 8110,
-      #           protocol: "http"
-      #         }} = NodePool.next_node()
+      assert %TypesenseEx.NodeStore.Node{
+               id: :nearest_node,
+               node: %Node{
+                 host: "localhost",
+                 port: 8110,
+                 protocol: "http"
+               }
+             } = NodePool.next_node()
     end
   end
 
@@ -341,12 +345,7 @@ defmodule TypesenseEx.NodePoolTest do
       } =
         node = NodePool.next_node()
 
-      # These tests run in a random order
-      # So, we set this to a long timeout
-      # so that Process.send_after doesn't
-      # pollute another test's ETS table
-      # TODO: explore mocking strategies here
-      NodePool.set_unhealthy(node, 50)
+      NodePool.set_unhealthy(node)
 
       assert {:error, :missing} = NodePool.next_node()
     end

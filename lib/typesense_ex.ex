@@ -1,5 +1,5 @@
 defmodule TypesenseEx do
-  @doc """
+  @moduledoc """
   Hydrates NodePool and Request servers (forthcoming) and their config
   """
   use Supervisor

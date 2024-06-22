@@ -53,7 +53,7 @@ defmodule TypesenseEx.Request do
   def execute(method, path, body \\ %{}, params \\ [], retries \\ 0, retry_node \\ nil) do
     %{connection_timeout: timeout} = config = config()
 
-    node = if not is_nil(retry_node), do: retry_node, else: NodePool.next_node()
+    node = if is_nil(retry_node), do: NodePool.next_node(), else: retry_node
 
     headers =
       []
