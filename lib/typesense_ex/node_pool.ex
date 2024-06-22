@@ -2,32 +2,16 @@ defmodule TypesenseEx.NodePool do
   @moduledoc """
   A pool that returns a round-robbin response of typesense nodes
   """
-  use Drops.Contract
 
   use GenServer
   alias __MODULE__
   alias TypesenseEx.Node
   alias TypesenseEx.NodeStore, as: Store
 
-  defstruct [:nearest_node, nodes: []]
-
-  defmodule Types.Node do
-    use Drops.Type, %{
-      required(:port) => integer(),
-      required(:host) => string(),
-      required(:protocol) => string(in?: ["http", "https"])
-    }
-  end
-
-  schema do
-    %{
-      optional(:nearest_node) => Types.Node,
-      optional(:nodes) => list(Types.Node)
-    }
-  end
+  defstruct [:nearest_node, nodes: [], healthcheck_interval: 2_000]
 
   def start_link(params \\ %{}) do
-    case NodePool.conform(params) do
+    case Store.conform(params) do
       {:ok, config} ->
         node_pool = struct(NodePool, config)
         GenServer.start_link(NodePool, node_pool, name: NodePool)
@@ -49,9 +33,9 @@ defmodule TypesenseEx.NodePool do
     end
   end
 
-  def set_unhealthy(%Store.Node{id: id, node: node}, milliseconds \\ 2000) do
+  def set_unhealthy(%Store.Node{id: id, node: node}) do
     remove(id)
-    add_after(id, node, milliseconds)
+    add_after(id, node)
   end
 
   @doc """
@@ -60,7 +44,8 @@ defmodule TypesenseEx.NodePool do
   Note: `:current_node` and `:nearest_node` may be set here as well
   by passing one of these atoms as the id.
   """
-  def add_after(id, node, milliseconds) do
+  def add_after(id, node) do
+    milliseconds = Store.get(:healthcheck_interval)
     Process.send_after(NodePool, {:add, id, node}, milliseconds)
   end
 
@@ -71,6 +56,8 @@ defmodule TypesenseEx.NodePool do
   @impl true
   def init(node_pool) do
     Store.init()
+
+    Store.add(:healthcheck_interval, node_pool.healthcheck_interval)
 
     init_nodes(node_pool)
     {:ok, []}

@@ -4,9 +4,9 @@ defmodule TypesenseExCase do
 
   using do
     quote do
-      import Mox
-
       setup :verify_on_exit!
+
+      use Mimic
 
       @valid_nodes [
         %{host: "localhost", port: "8107", protocol: "https"},
@@ -15,11 +15,11 @@ defmodule TypesenseExCase do
 
       @minimal_valid_config %{
         api_key: "123",
-        connection_timeout_seconds: 0,
+        connection_timeout: 0,
         num_retries: 2,
         nodes: @valid_nodes,
         # A convenience to prevent tests from being slow
-        healthcheck_interval_seconds: 0
+        healthcheck_interval: 0
       }
 
       def assert_misconfig(module, config, msg) do

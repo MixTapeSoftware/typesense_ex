@@ -6,4 +6,6 @@ Application.put_env(:typesense_ex, :client_config, %{
   ]
 })
 
+Mimic.copy(Tesla)
+
 ExUnit.start()
