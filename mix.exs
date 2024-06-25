@@ -5,7 +5,7 @@ defmodule TypesenseEx.MixProject do
     [
       app: :typesense_ex,
       version: "0.1.0",
-      elixir: "~> 1.16",
+      elixir: "~> 1.13",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps()
@@ -15,8 +15,7 @@ defmodule TypesenseEx.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
-      mod: application_module()
+      extra_applications: [:logger]
     ]
   end
 
@@ -29,15 +28,6 @@ defmodule TypesenseEx.MixProject do
       {:mimic, "~> 1.8", only: :test},
       {:tesla, "~> 1.11"}
     ]
-  end
-
-  defp application_module do
-    # Check if the MIX_ENV is "test" and return nil if so
-    if runtime_env() === :test, do: [], else: [mod: {TypesenseEx.Application, []}]
-  end
-
-  defp runtime_env do
-    Application.get_env(:typesense_ex, :env)
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]
