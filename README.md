@@ -1,8 +1,9 @@
 # TypesenseEx
+
 (**EXPERIMENTAL / WORK IN PROGRESS**)
 
-* Elixir bindings for the [Typesense REST Api](https://typesense.org/docs/0.24.1/api/)
-* A round-robbin load balancer for Typesense Nodes
+- Elixir bindings for the [Typesense REST Api](https://typesense.org/docs/0.24.1/api/)
+- A round-robbin load balancer for Typesense Nodes
 
 ## Installation and Configuration
 
@@ -34,13 +35,12 @@ volumes:
 ```elixir
 def deps do
   [
-    {:typesense_ex, git: "git@github.com:GetAfterItApps/typesense.git"}
+    {:typesense_ex, git: "https://github.com/MixTapeSoftware/typesense_ex.git"}
   ]
 end
 ```
 
 Add the Typesense to your supervision tree:
-
 
 ```elixir
   @impl true
@@ -86,13 +86,12 @@ TypesenseEx is configurable at application start. Configuration may also be upda
 
 **Configuration Options**
 
-| Name                         | Description                                                                                                                |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| nodes                        | (optional) A list of typesense node configurations
-| nearest_node                 | (optional) A Typesense cloud [Search Delivery Network](https://typesense.org/docs/guide/typesense-cloud/search-delivery-network.html#how-it-helps) feature.                                                                                 |
-| api_key                      | (optional but recommended) A string representing the configured typesense api key (e.g. above it's "`MY_TYPESENSE_API_KEY`")            |
-| connection_timeout  | [defaults to 10,000] Establishes how long in *milli*seconds Typesense should wait before retrying a request to a typesense node after timing out |
-| num_retries                  | [defaults to 3] The number of retry attempts that should be made before marking a node unhealthy                           |
-| retry_interval       | [defaults to 100 / .10 second] The number of *milli*seconds to wait between retries                                                            |
-| healthcheck_interval | [defaults to 15,000 / 15 seconds] The number of *milli*seconds to wait before resuming requests for a node after it has been marked unhealthy      |`
-
+| Name                 | Description                                                                                                                                                 |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | --- |
+| nodes                | (optional) A list of typesense node configurations                                                                                                          |
+| nearest_node         | (optional) A Typesense cloud [Search Delivery Network](https://typesense.org/docs/guide/typesense-cloud/search-delivery-network.html#how-it-helps) feature. |
+| api_key              | (optional but recommended) A string representing the configured typesense api key (e.g. above it's "`MY_TYPESENSE_API_KEY`")                                |
+| connection_timeout   | [defaults to 10,000] Establishes how long in *milli*seconds Typesense should wait before retrying a request to a typesense node after timing out            |
+| num_retries          | [defaults to 3] The number of retry attempts that should be made before marking a node unhealthy                                                            |
+| retry_interval       | [defaults to 100 / .10 second] The number of *milli*seconds to wait between retries                                                                         |
+| healthcheck_interval | [defaults to 15,000 / 15 seconds] The number of *milli*seconds to wait before resuming requests for a node after it has been marked unhealthy               | `   |
