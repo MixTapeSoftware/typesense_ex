@@ -1,79 +1,34 @@
-# Typesense
+# TypesenseEx
 
 (**EXPERIMENTAL / WORK IN PROGRESS**)
 
-## Elixir bindings for the [Typesense REST Api](https://typesense.org/docs/0.24.1/api/).
+- Elixir bindings for the [Typesense REST API](https://typesense.org/docs/0.24.1/api/)
+- A round-robbin load balancer for Typesense nodes
 
-Th package is incomplete and will continue to change for the near future.
+[![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2FMixTapeSoftware%2Ftypesense_ex%2Fblob%2Fmain%2Flivebook.md)
 
-### Why An Elixir Load Balancer?
-
-In many cases an external load balancer may not be present. As a result,
-`Typesense` implements an Elixir-based load balancer for Typesense nodes. Nodes
-that are non-responsive after configurable set of retries and health check seconds
-interval are marked as healthy and will not be retried for a period of time (also
-configurable). All users of the application share the Client, causing node requests
-to be distributed evenly across users.
+We will continue to add to this LiveBook as the API develops.
 
 ## Installation and Configuration
 
 ### Install Typesense
 
-Either [Install typesense locally](https://typesense.org/docs/guide/install-typesense.html) or
-use the hosted version, [typesense cloud](https://cloud.typesense.org/).
+Either [install Typesense locally](https://typesense.org/docs/guide/install-typesense.html) or
+use the hosted version, [Typesense Cloud](https://cloud.typesense.org/).
 
-**Example** of a docker-compose typesense instance with an api key configured:
-
-```docker
-
-version: "3.3"
-services:
-  typesense:
-    image: typesense/typesense:0.24.0
-    ports:
-      - "127.0.0.1:8108:8108"
-    volumes:
-      - typesense:/data
-    command: "--data-dir /data --api-key=MY_TYPESENSE_API_KEY --enable-cors"
-
-volumes:
-  typesense:
-    driver: local
-```
+See the [docker-compose.yml](docker-compose.yml) file for a an example of a local development instance.
 
 ### Install the Package
 
 ```elixir
 def deps do
   [
-    {:typesense_ex, git: "git@github.com:GetAfterItApps/typesense.git"}
+    {:typesense_ex, git: "https://github.com/MixTapeSoftware/typesense_ex"}
   ]
 end
 ```
 
-### Configuration
-
-```elixir
-
-config :my_app, :typesense,
-  nodes: [%{host: "localhost", port: "8108", protocol: "http"}]
-```
-
-**Configuration Options**
-
-| Name                         | Description                                                                                                                |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| nodes                        | (required) A list of typesense node configurations                                                                         |
-| api_key                      | (recommended) A string representing the configured typesense api key (e.g. above it's "`MY_TYPESENSE_API_KEY`")            |
-| connection_timeout_seconds   | [defaults to 10] Establishes how long Typesense should wait before retrying a request to a typesense node after timing out |
-| num_retries                  | [defaults to 3] The number of retry attempts that should be made before marking a node unhealthy                           |
-| retry_interval_seconds       | [defaults to 0.1] The number of seconds to wait between retries                                                            |
-| healthcheck_interval_seconds | [defaults to 15] The number of seconds to wait before resuming requests for a node after it has been marked unhealthy      |
-
-Add the Typesense to your supervision tree.
-
-Note: configuration is passed into the client directly as recommended
-in the [Mix Library Guidelines](https://hexdocs.pm/elixir/main/library-guidelines.html#avoid-application-configuration)
+Add the Typesense to your supervision tree:
 
 ```elixir
   @impl true
@@ -89,7 +44,7 @@ in the [Mix Library Guidelines](https://hexdocs.pm/elixir/main/library-guideline
       {Finch, name: YourApp.Finch},
       # Start the Endpoint (http/https)
       YourAppWeb.Endpoint,
-      {Typesense.Client, typesense_config()}
+      {TypesenseEx, typesense_config()}, # <-- Add Me!
 
       # Start a worker by calling: YourApp.Worker.start_link(arg)
       # {YourApp.Worker, arg}
@@ -112,62 +67,19 @@ in the [Mix Library Guidelines](https://hexdocs.pm/elixir/main/library-guideline
   end
 
 ```
-### Optional Configuration
 
-Typesense uses Tesla and Tesla is configurable to use other Adapters. e.g.:
+### Configuration
 
-```elixir
-config :tesla, :adapter, {Tesla.Adapter.Finch, name: MyApp.Finch}
+TypesenseEx is configurable at application start. Configuration may also be updated in a running service (e.g. to dynamically add/remove Typesense nodes as they come online or have been terminated).
 
-```
+**Configuration Options**
 
-## Usage
-
-Add a [Typesense Collection](https://typesense.org/docs/0.24.1/api/collections.html):
-
-```elixir
-schema = %{
-  name: "companies",
-  fields: [
-    %{name: "company_name", type: "string"},
-    %{name: "num_employees", type: "int32"},
-    %{name: "country", type: "string", facet: true},
-  ],
-  default_sorting_field: "num_employees"
-}
-
-iex> Typesense.Collections.create(schema)
-```
-
-Add [Typesense Document](https://typesense.org/docs/0.24.1/api/documents.html)
-
-```elixir
-document = %{
-  id: "1170",
-  company_name: "Jeff's Extra Toothy Kitteh Treats",
-  num_employees: 1,
-  country: "US"
-}
-
-iex> Typesense.Documents.create("companies", document)
-```
-
-Search for Typesense Documents
-
-```elixir
-
-iex> Typesense.Documents.search("companies", %{q: "Jeffs", query_by: "company_name"})
-```
-
-## Todo
-
-- [ ] Allow `Client` to dynamically add/remove nodes
-- [ ] [`Multisearch`](https://typesense.org/docs/0.24.1/api/federated-multi-search.html)
-- [ ] [`Api Keys` management](https://typesense.org/docs/0.24.1/api/api-keys.html)
-- [ ] [`Curation` Overrides](https://typesense.org/docs/0.24.1/api/curation.html)
-- [ ] [`Collection Aliases`](https://typesense.org/docs/0.24.1/api/collection-alias.html)
-- [ ] [`Synonyms`](https://typesense.org/docs/0.24.1/api/synonyms.html)
-- [ ] [`Cluster Operations`](https://typesense.org/docs/0.24.1/api/cluster-operations.html)
-- [ ] Return [official Error Codes text](https://typesense.org/docs/0.24.1/api/api-errors.html)
-
-
+| Name                 | Description                                                                                                                                                 |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| nodes                | (optional) A list of typesense node configurations                                                                                                          |
+| nearest_node         | (optional) A Typesense cloud [Search Delivery Network](https://typesense.org/docs/guide/typesense-cloud/search-delivery-network.html#how-it-helps) feature. |
+| api_key              | (optional but recommended) A string representing the configured typesense api key (e.g. above it's "`MY_TYPESENSE_API_KEY`")                                |
+| connection_timeout   | [defaults to 10,000] Establishes how long in *milli*seconds Typesense should wait before retrying a request to a typesense node after timing out            |
+| num_retries          | [defaults to 3] The number of retry attempts that should be made before marking a node unhealthy                                                            |
+| retry_interval       | [defaults to 100 / .10 second] The number of *milli*seconds to wait between retries                                                                         |
+| healthcheck_interval | [defaults to 15,000 / 15 seconds] The number of *milli*seconds to wait before resuming requests for a node after it has been marked unhealthy               |
