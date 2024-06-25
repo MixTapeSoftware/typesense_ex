@@ -29,11 +29,11 @@ defmodule TypesenseEx.Store do
   end
 
   def first(table) do
-    :ets.first_lookup(table) |> result()
+    get(table, :ets.first(table))
   end
 
   def next(table, key) do
-    :ets.next_lookup(table, key) |> result()
+    get(table, :ets.next(table, key))
   end
 
   def get(table, key) do
@@ -50,12 +50,5 @@ defmodule TypesenseEx.Store do
 
   def remove(table, key) do
     :ets.delete(table, key)
-  end
-
-  defp result(result) do
-    case result do
-      :"$end_of_table" -> @missing_error
-      {id, [{_id, node, _pid}]} -> {:ok, {id, node}}
-    end
   end
 end
