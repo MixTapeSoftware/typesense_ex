@@ -15,8 +15,7 @@ defmodule TypesenseEx.RequestTest do
         ]
       }
 
-      start_supervised!({Request, node_configs})
-      start_supervised!({NodePool, node_configs})
+      start_supervised!({TypesenseEx, node_configs})
 
       :ok
     end
@@ -63,8 +62,7 @@ defmodule TypesenseEx.RequestTest do
         ]
       }
 
-      start_supervised!({Request, node_configs})
-      start_supervised!({NodePool, node_configs})
+      start_supervised!({TypesenseEx, node_configs})
 
       :ok
     end
