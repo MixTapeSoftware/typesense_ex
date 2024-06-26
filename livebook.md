@@ -150,7 +150,7 @@ For really large JSON data sets, we can take advantage of Typsenses's support fo
     },
     %{
       id: "1174",
-      company_name: "Raul's Meownager Training Institute",
+      company_name: "Raúl's Meownager Training Institute",
       num_employees: 1,
       country: "US"
     }
