@@ -18,7 +18,7 @@ defmodule TypesenseEx.DocumentTest do
   test "create/3" do
     expected_options = [
       method: :post,
-      url: "https://localhost:8107/collections/foo/documents",
+      url: "https://localhost:8107/collections/companies/documents",
       query: [],
       body: "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}",
       headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "application/json"}]
@@ -27,7 +27,7 @@ defmodule TypesenseEx.DocumentTest do
     expect(expected_options)
 
     doc = docs(1) |> List.first()
-    Documents.create("foo", doc)
+    Documents.create("companies", doc)
   end
 
   test "imports some documents" do
@@ -48,7 +48,7 @@ defmodule TypesenseEx.DocumentTest do
   test "upsert/3" do
     expected_options = [
       method: :post,
-      url: "https://localhost:8107/collections/foo/documents",
+      url: "https://localhost:8107/collections/companies/documents",
       query: [{:action, :upsert}],
       body: "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}",
       headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "application/json"}]
@@ -57,13 +57,13 @@ defmodule TypesenseEx.DocumentTest do
     expect(expected_options)
 
     doc = docs(1) |> List.first()
-    Documents.upsert("foo", doc)
+    Documents.upsert("companies", doc)
   end
 
   test "update/3" do
     expected_options = [
       method: :post,
-      url: "https://localhost:8107/collections/foo/documents",
+      url: "https://localhost:8107/collections/companies/documents",
       query: [{:action, :update}],
       body: "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}",
       headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "application/json"}]
@@ -72,14 +72,14 @@ defmodule TypesenseEx.DocumentTest do
     expect(expected_options)
 
     doc = docs(1) |> List.first()
-    Documents.update("foo", doc)
+    Documents.update("companies", doc)
   end
 
   test "partial_update/3" do
     expected_options = [
       method: :patch,
-      url: "https://localhost:8107/collections/foo/documents/0",
-      query: %{"filter_by" => "num_employees:>0"},
+      url: "https://localhost:8107/collections/companies/documents/0",
+      query: [],
       body: "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}",
       headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "application/json"}]
     ]
@@ -87,18 +87,18 @@ defmodule TypesenseEx.DocumentTest do
     expect(expected_options)
 
     doc = docs(1) |> List.first()
-    Documents.partial_update("foo", doc, %{"filter_by" => "num_employees:>0"})
+    Documents.partial_update("companies", doc)
 
     expect(
       method: :patch,
-      url: "https://localhost:8107/collections/foo/documents/1",
-      query: %{"filter_by" => "num_employees:>0"},
+      url: "https://localhost:8107/collections/companies/documents/1",
+      query: [],
       body: "{\"id\":1,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}",
       headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "application/json"}]
     )
 
     doc = docs(1) |> List.first() |> Map.delete("id") |> Map.put(:id, 1)
-    Documents.partial_update("foo", doc, %{"filter_by" => "num_employees:>0"})
+    Documents.partial_update("companies", doc)
   end
 
   def expect(expected_options) do
@@ -112,7 +112,7 @@ defmodule TypesenseEx.DocumentTest do
   test "get/3" do
     expected_options = [
       method: :get,
-      url: "https://localhost:8107/collections/foo/documents/0",
+      url: "https://localhost:8107/collections/companies/documents/0",
       query: [],
       body: nil,
       headers: [{"X-TYPESENSE-API-KEY", "123"}]
@@ -121,13 +121,13 @@ defmodule TypesenseEx.DocumentTest do
     expect(expected_options)
 
     docs(1) |> List.first()
-    Documents.get("foo", 0)
+    Documents.get("companies", 0)
   end
 
   test "delete/3" do
     expected_options = [
       method: :delete,
-      url: "https://localhost:8107/collections/foo/documents/0",
+      url: "https://localhost:8107/collections/companies/documents/0",
       query: [],
       body: nil,
       headers: [{"X-TYPESENSE-API-KEY", "123"}]
@@ -136,24 +136,24 @@ defmodule TypesenseEx.DocumentTest do
     expect(expected_options)
 
     docs(1) |> List.first()
-    Documents.delete("foo", 0)
+    Documents.delete("companies", 0)
 
     expect(
       method: :delete,
-      url: "https://localhost:8107/collections/foo/documents",
+      url: "https://localhost:8107/collections/companies/documents",
       query: %{"q" => "*", "filter_by" => "num_employees:1"},
       body: nil,
       headers: [{"X-TYPESENSE-API-KEY", "123"}]
     )
 
     docs(1) |> List.first()
-    Documents.delete("foo", %{"q" => "*", "filter_by" => "num_employees:1"})
+    Documents.delete("companies", %{"q" => "*", "filter_by" => "num_employees:1"})
   end
 
   test "search/3" do
     expected_options = [
       method: :get,
-      url: "https://localhost:8107/collections/foo/documents/search",
+      url: "https://localhost:8107/collections/companies/documents/search",
       query: %{"filter_by" => "num_employees:1", "q" => "*"},
       body: nil,
       headers: [{"X-TYPESENSE-API-KEY", "123"}]
@@ -162,7 +162,7 @@ defmodule TypesenseEx.DocumentTest do
     expect(expected_options)
 
     docs(1) |> List.first()
-    Documents.search("foo", %{"q" => "*", "filter_by" => "num_employees:1"})
+    Documents.search("companies", %{"q" => "*", "filter_by" => "num_employees:1"})
   end
 
   def docs(count) do
