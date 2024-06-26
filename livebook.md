@@ -180,5 +180,5 @@ TypesenseEx.Documents.search("companies", %{"q" => "*"})
 ```
 
 ```elixir
-TypesenseEx.Documents.get("companies", "1170")
+TypesenseEx.Documents.get("companies", "1174")
 ```
