@@ -38,6 +38,8 @@ children = [
 
 ```
 
+<!-- livebook:{"branch_parent_index":1} -->
+
 ## Collections
 
 From the Typesense docs:
@@ -60,7 +62,9 @@ schema = %{
 TypesenseEx.Collections.create(schema)
 ```
 
-## Documents
+<!-- livebook:{"branch_parent_index":1} -->
+
+## Create and Manage Documents
 
 Records stored in Typesense are called "documents."
 
@@ -73,4 +77,108 @@ document = %{
 }
 
 TypesenseEx.Documents.create("companies", document)
+```
+
+```elixir
+document = %{
+  id: "1170",
+  company_name: "Jeff's Extra Really Big Toothy Kitteh Treats",
+  num_employees: 1,
+  country: "US"
+}
+
+TypesenseEx.Documents.update("companies", document)
+```
+
+```elixir
+document = %{
+  id: "1170",
+  num_employees: 10,
+}
+
+TypesenseEx.Documents.partial_update("companies", document)
+```
+
+```elixir
+TypesenseEx.Documents.delete("companies", "1170")
+```
+
+```elixir
+document = %{
+  id: "1170",
+  company_name: "Jeff's Extra Toothy Kitteh Treats",
+  num_employees: 100,
+  country: "US"
+}
+
+TypesenseEx.Documents.create("companies", document)
+TypesenseEx.Documents.delete("companies", %{"q" => "*", "filter_by" => "num_employees:>99"})
+
+
+```
+
+```elixir
+  documents = [
+    %{
+      id: "1171",
+      company_name: "Perseus's House of Fangs",
+      num_employees: 1,
+      country: "US"
+    },
+    %{
+      id: "1172",
+      company_name: "Southwestern Tenderpaw Solutions",
+      num_employees: 1,
+      country: "US"
+    }
+  ]
+
+
+TypesenseEx.Documents.import_documents("companies", documents)
+
+```
+
+For really large JSON data sets, we can take advantage of Typsenses's support for [JSON Lines](https://jsonlines.org/examples/)
+
+```elixir
+  documents = [
+    %{
+      id: "1173",
+      company_name: "Mr. Luxurious Enterprises",
+      num_employees: 1,
+      country: "US"
+    },
+    %{
+      id: "1174",
+      company_name: "Raul's Meownager Training Institute",
+      num_employees: 1,
+      country: "US"
+    }
+  ]
+# pretend we are loading this from a very large file 😺
+jsonl_docs =
+  Enum.map(documents, fn doc -> Jason.encode!(doc) end)
+  |> Enum.join("\n")
+
+TypesenseEx.Documents.import_documents("companies", jsonl_docs)
+
+```
+
+```elixir
+TypesenseEx.Documents.export_documents("companies")
+
+```
+
+<!-- livebook:{"branch_parent_index":1} -->
+
+## Search and Retrieve Documents
+
+See the [Typesense Docs](https://typesense.org/docs/26.0/api/search.html) for all the ways you can search.
+
+```elixir
+TypesenseEx.Documents.search("companies", %{"q" => "*"})
+```
+
+```elixir
+TypesenseEx.Documents.get("companies", "1170")
 ```
