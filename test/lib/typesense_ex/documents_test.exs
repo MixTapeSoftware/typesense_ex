@@ -15,36 +15,90 @@ defmodule TypesenseEx.DocumentTest do
     :ok
   end
 
-  describe "with configured nodes" do
-    test "create/3" do
-      expected_options = [
-        method: :post,
-        url: "https://localhost:8107/collections/foo/documents",
-        query: [],
-        body: "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}",
-        headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "application/json"}]
-      ]
+  test "create/3" do
+    expected_options = [
+      method: :post,
+      url: "https://localhost:8107/collections/foo/documents",
+      query: [],
+      body: "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}",
+      headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "application/json"}]
+    ]
 
-      expect(expected_options)
+    expect(expected_options)
 
-      doc = docs(1) |> List.first()
-      Documents.create("foo", doc)
-    end
+    doc = docs(1) |> List.first()
+    Documents.create("foo", doc)
+  end
 
-    test "imports some documents" do
-      expected_options = [
-        method: :post,
-        url: "https://localhost:8107/collections/companies/documents/import",
-        query: [action: :insert],
-        body:
-          "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}\n{\"id\":1,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":1}\n{\"id\":2,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":2}",
-        headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "text/plain"}]
-      ]
+  test "imports some documents" do
+    expected_options = [
+      method: :post,
+      url: "https://localhost:8107/collections/companies/documents/import",
+      query: [action: :insert],
+      body:
+        "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}\n{\"id\":1,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":1}\n{\"id\":2,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":2}",
+      headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "text/plain"}]
+    ]
 
-      expect(expected_options)
+    expect(expected_options)
 
-      Documents.import_documents("companies", docs(2), action: :insert)
-    end
+    Documents.import_documents("companies", docs(2), action: :insert)
+  end
+
+  test "upsert/3" do
+    expected_options = [
+      method: :post,
+      url: "https://localhost:8107/collections/foo/documents",
+      query: [{:action, :upsert}],
+      body: "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}",
+      headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "application/json"}]
+    ]
+
+    expect(expected_options)
+
+    doc = docs(1) |> List.first()
+    Documents.upsert("foo", doc)
+  end
+
+  test "update/3" do
+    expected_options = [
+      method: :post,
+      url: "https://localhost:8107/collections/foo/documents",
+      query: [{:action, :update}],
+      body: "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}",
+      headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "application/json"}]
+    ]
+
+    expect(expected_options)
+
+    doc = docs(1) |> List.first()
+    Documents.update("foo", doc)
+  end
+
+  test "partial_update/3" do
+    expected_options = [
+      method: :patch,
+      url: "https://localhost:8107/collections/foo/documents/0",
+      query: %{"filter_by" => "num_employees:>0"},
+      body: "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}",
+      headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "application/json"}]
+    ]
+
+    expect(expected_options)
+
+    doc = docs(1) |> List.first()
+    Documents.partial_update("foo", doc, %{"filter_by" => "num_employees:>0"})
+
+    expect(
+      method: :patch,
+      url: "https://localhost:8107/collections/foo/documents/1",
+      query: %{"filter_by" => "num_employees:>0"},
+      body: "{\"id\":1,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}",
+      headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "application/json"}]
+    )
+
+    doc = docs(1) |> List.first() |> Map.delete("id") |> Map.put(:id, 1)
+    Documents.partial_update("foo", doc, %{"filter_by" => "num_employees:>0"})
   end
 
   def expect(expected_options) do
@@ -55,6 +109,62 @@ defmodule TypesenseEx.DocumentTest do
     end)
   end
 
+  test "get/3" do
+    expected_options = [
+      method: :get,
+      url: "https://localhost:8107/collections/foo/documents/0",
+      query: [],
+      body: nil,
+      headers: [{"X-TYPESENSE-API-KEY", "123"}]
+    ]
+
+    expect(expected_options)
+
+    docs(1) |> List.first()
+    Documents.get("foo", 0)
+  end
+
+  test "delete/3" do
+    expected_options = [
+      method: :delete,
+      url: "https://localhost:8107/collections/foo/documents/0",
+      query: [],
+      body: nil,
+      headers: [{"X-TYPESENSE-API-KEY", "123"}]
+    ]
+
+    expect(expected_options)
+
+    docs(1) |> List.first()
+    Documents.delete("foo", 0)
+
+    expect(
+      method: :delete,
+      url: "https://localhost:8107/collections/foo/documents",
+      query: %{"q" => "*", "filter_by" => "num_employees:1"},
+      body: nil,
+      headers: [{"X-TYPESENSE-API-KEY", "123"}]
+    )
+
+    docs(1) |> List.first()
+    Documents.delete("foo", %{"q" => "*", "filter_by" => "num_employees:1"})
+  end
+
+  test "search/3" do
+    expected_options = [
+      method: :get,
+      url: "https://localhost:8107/collections/foo/documents/search",
+      query: %{"filter_by" => "num_employees:1", "q" => "*"},
+      body: nil,
+      headers: [{"X-TYPESENSE-API-KEY", "123"}]
+    ]
+
+    expect(expected_options)
+
+    docs(1) |> List.first()
+    Documents.search("foo", %{"q" => "*", "filter_by" => "num_employees:1"})
+  end
+
   def docs(count) do
     Enum.map(0..count, fn index ->
       %{
@@ -63,5 +173,58 @@ defmodule TypesenseEx.DocumentTest do
         "num_employees" => index
       }
     end)
+  end
+
+  describe "importing documents" do
+    test "no documents given" do
+      assert {:error, "No documents were given"} = Documents.import_documents("companies", [])
+    end
+
+    test "a list of documents" do
+      expected_options = [
+        method: :post,
+        url: "https://localhost:8107/collections/companies/documents/import",
+        query: [],
+        body:
+          "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}\n{\"id\":1,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":1}\n{\"id\":2,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":2}\n{\"id\":3,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":3}",
+        headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "text/plain"}]
+      ]
+
+      expect(expected_options)
+
+      docs = docs(3)
+      assert {:ok, %{"results" => []}} = Documents.import_documents("companies", docs)
+    end
+
+    test "a JSON string" do
+      expected_options = [
+        method: :post,
+        url: "https://localhost:8107/collections/companies/documents/import",
+        query: [],
+        body:
+          "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}\n{\"id\":1,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":1}\n{\"id\":2,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":2}\n{\"id\":3,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":3}",
+        headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "text/plain"}]
+      ]
+
+      expect(expected_options)
+
+      docs =
+        "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}\n{\"id\":1,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":1}\n{\"id\":2,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":2}\n{\"id\":3,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":3}"
+
+      Documents.import_documents("companies", docs)
+    end
+  end
+
+  test "export_documents/2" do
+    expected_options = [
+      method: :get,
+      url: "https://localhost:8107/collections/companies/documents/export",
+      query: %{"filter_by" => "num_employees:>100", "q" => "*"},
+      body: nil,
+      headers: [{"X-TYPESENSE-API-KEY", "123"}]
+    ]
+
+    expect(expected_options)
+    Documents.export_documents("companies", %{"q" => "*", "filter_by" => "num_employees:>100"})
   end
 end

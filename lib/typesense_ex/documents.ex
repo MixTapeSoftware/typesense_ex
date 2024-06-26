@@ -19,23 +19,25 @@ defmodule TypesenseEx.Documents do
   end
 
   def partial_update(collection, partial_document, params \\ []) do
-    path = endpoint_path(collection, partial_document["id"])
+    # Do we want to just cast all params to strings?
+    id = partial_document["id"] || partial_document[:id]
+    path = endpoint_path(collection, id)
     Request.execute(:patch, path, partial_document, params)
   end
 
-  def retrieve(collection, document_id, params \\ []) do
+  def get(collection, document_id, params \\ []) do
     path = endpoint_path(collection, document_id)
-    Request.execute(:patch, path, nil, params)
+    Request.execute(:get, path, nil, params)
   end
 
-  def delete(collection, document_id) when is_integer(document_id) do
-    document_path = endpoint_path(collection, document_id)
-    Request.execute(:delete, document_path, nil)
-  end
-
-  def delete(collection, search_params) do
+  def delete(collection, search_params) when is_map(search_params) do
     document_path = endpoint_path(collection)
     Request.execute(:delete, document_path, nil, search_params)
+  end
+
+  def delete(collection, document_id) do
+    document_path = endpoint_path(collection, document_id)
+    Request.execute(:delete, document_path, nil)
   end
 
   def search(collection, search_params) do
