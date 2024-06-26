@@ -2,7 +2,7 @@
 
 (**EXPERIMENTAL / WORK IN PROGRESS**)
 
-- Elixir bindings for the [Typesense REST API](https://typesense.org/docs/0.24.1/api/)
+- Elixir bindings for the [Typesense REST API](https://typesense.org/docs/)
 - A round-robbin load balancer for Typesense nodes
 
 [![Run in Livebook](https://livebook.dev/badge/v1/blue.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2FMixTapeSoftware%2Ftypesense_ex%2Fblob%2Fmain%2Flivebook.md)
