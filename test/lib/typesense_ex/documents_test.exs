@@ -34,7 +34,7 @@ defmodule TypesenseEx.DocumentTest do
     expected_options = [
       method: :post,
       url: "https://localhost:8107/collections/companies/documents/import",
-      query: [action: :insert],
+      query: [action: :create],
       body:
         "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}\n{\"id\":1,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":1}\n{\"id\":2,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":2}",
       headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "text/plain"}]
@@ -42,7 +42,7 @@ defmodule TypesenseEx.DocumentTest do
 
     expect(expected_options)
 
-    Documents.import_documents("companies", docs(2), action: :insert)
+    Documents.import_documents("companies", docs(2), action: :create)
   end
 
   test "upsert/3" do
@@ -184,7 +184,7 @@ defmodule TypesenseEx.DocumentTest do
       expected_options = [
         method: :post,
         url: "https://localhost:8107/collections/companies/documents/import",
-        query: [],
+        query: [{:action, :create}],
         body:
           "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}\n{\"id\":1,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":1}\n{\"id\":2,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":2}\n{\"id\":3,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":3}",
         headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "text/plain"}]
@@ -200,7 +200,7 @@ defmodule TypesenseEx.DocumentTest do
       expected_options = [
         method: :post,
         url: "https://localhost:8107/collections/companies/documents/import",
-        query: [],
+        query: [{:action, :create}],
         body:
           "{\"id\":0,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":0}\n{\"id\":1,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":1}\n{\"id\":2,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":2}\n{\"id\":3,\"location_name\":\"Jeff's Litterbox Hotel\",\"num_employees\":3}",
         headers: [{"X-TYPESENSE-API-KEY", "123"}, {"Content-Type", "text/plain"}]

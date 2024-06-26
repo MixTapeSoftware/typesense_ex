@@ -81,6 +81,7 @@ defmodule TypesenseEx.Documents do
 
   def import_documents(collection, documents, params) when is_binary(documents) do
     path = endpoint_path(collection, "import")
+    params = Keyword.merge(params, action: :create)
     Request.execute(:post, path, documents, params)
   end
 
